@@ -1,6 +1,6 @@
 /* ============================================================
-   🛺 لعبة توك توك كفر الدوار - 3D
-   كود واحد كامل - بدون أخطاء
+   🛺 توك توك كفر الدوار - منظور الشخص الثالث
+   نسخة محسّنة للموبايل والأداء العالي
    ============================================================ */
 
 (function() {
@@ -8,35 +8,56 @@
 
 console.log('🚀 بدء تحميل اللعبة...');
 
-/* ============================================================
-   التحقق من تحميل Three.js
-   ============================================================ */
 if (typeof THREE === 'undefined') {
-  console.error('❌ Three.js لم يتم تحميله! تأكد من الاتصال بالإنترنت.');
-  alert('فشل تحميل Three.js. تأكد من الاتصال بالإنترنت وأعد تحميل الصفحة.');
+  alert('فشل تحميل Three.js. تأكد من الاتصال بالإنترنت.');
   return;
 }
-console.log('✅ Three.js جاهز');
 
 /* ============================================================
-   الإعدادات
+   كشف الجهاز وتحديد الجودة تلقائياً
+   ============================================================ */
+const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+  || (navigator.maxTouchPoints && navigator.maxTouchPoints > 2 && /MacIntel/.test(navigator.platform))
+  || window.matchMedia('(pointer: coarse)').matches;
+
+const isLowEnd = isMobile && (navigator.hardwareConcurrency || 2) <= 4;
+
+console.log('📱 الجهاز:', isMobile ? 'موبايل' : 'كمبيوتر');
+console.log('⚙️ الجودة:', isLowEnd ? 'منخفضة' : (isMobile ? 'متوسطة' : 'عالية'));
+
+/* ============================================================
+   إعدادات الجودة التلقائية
+   ============================================================ */
+const QUALITY = {
+  pixelRatio: isLowEnd ? 1 : (isMobile ? 1.3 : 1.8),
+  shadows: !isLowEnd,
+  shadowMapSize: isLowEnd ? 512 : (isMobile ? 1024 : 2048),
+  fogFar: isLowEnd ? 400 : (isMobile ? 600 : 1000),
+  drawDistance: isLowEnd ? 400 : (isMobile ? 600 : 1000),
+  treeCount: isLowEnd ? 40 : (isMobile ? 80 : 150),
+  buildingDensity: isLowEnd ? 0.35 : (isMobile ? 0.55 : 0.75),
+  enableWindows: !isLowEnd,
+  enableFoliage: !isLowEnd || isMobile,
+};
+
+/* ============================================================
+   الإعدادات العامة
    ============================================================ */
 const CONFIG = {
-  citySize: 2000,
+  citySize: 1400,
   canalWidth: 25,
-  roadWidth: 24,
-  sidewalkWidth: 3,
-  maxSpeed: 16,
-  maxReverseSpeed: 5,
-  acceleration: 7,
-  braking: 14,
-  friction: 0.8,
-  steeringSpeed: 3.2,
+  roadWidth: 20,
+  sidewalkWidth: 2.5,
+  maxSpeed: 14,
+  maxReverseSpeed: 4,
+  acceleration: 6,
+  braking: 12,
+  friction: 0.7,
+  steeringSpeed: 3,
   maxWheelAngle: 0.55,
-  gameDuration: 180,
-  maxPassengers: 3,
-  shadowQuality: 2048,
-  enableShadows: true,
+  gameDuration: 300,        // 5 دقائق
+  deliveryBonus: 30,        // 30 ثانية لكل توصيلة
+  maxPassengers: 2,
 };
 
 const COLORS = {
@@ -48,70 +69,57 @@ const COLORS = {
 };
 
 /* ============================================================
-   كشف الجهاز
-   ============================================================ */
-const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
-  || (navigator.maxTouchPoints && navigator.maxTouchPoints > 2 && /MacIntel/.test(navigator.platform))
-  || window.matchMedia('(pointer: coarse)').matches;
-
-console.log('📱 الجهاز:', isMobile ? 'موبايل/تابلت' : 'كمبيوتر');
-
-/* ============================================================
-   المشهد والكاميرا والمصير
+   المشهد
    ============================================================ */
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(COLORS.sky);
-scene.fog = new THREE.Fog(COLORS.sky, 250, 1000);
+scene.fog = new THREE.Fog(COLORS.sky, 100, QUALITY.fogFar);
 
 const camera = new THREE.PerspectiveCamera(
-  72,
+  65,
   window.innerWidth / window.innerHeight,
-  0.05,
-  3000
+  0.3,
+  QUALITY.drawDistance + 500
 );
 
 const renderer = new THREE.WebGLRenderer({
   canvas: document.getElementById('gameCanvas'),
-  antialias: true,
+  antialias: !isLowEnd,
   powerPreference: 'high-performance',
   stencil: false,
   alpha: false,
 });
 
 renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-renderer.shadowMap.enabled = CONFIG.enableShadows;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, QUALITY.pixelRatio));
+renderer.shadowMap.enabled = QUALITY.shadows;
+renderer.shadowMap.type = THREE.PCFShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.15;
+renderer.toneMappingExposure = 1.1;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 
 /* ============================================================
-   الإضاءة
+   الإضاءة (خفيفة للموبايل)
    ============================================================ */
-const sunLight = new THREE.DirectionalLight(0xfff5e0, 2.6);
-sunLight.position.set(200, 300, 150);
-sunLight.castShadow = CONFIG.enableShadows;
-if (CONFIG.enableShadows) {
-  sunLight.shadow.mapSize.width = CONFIG.shadowQuality;
-  sunLight.shadow.mapSize.height = CONFIG.shadowQuality;
+const sunLight = new THREE.DirectionalLight(0xfff5e0, 2.2);
+sunLight.position.set(150, 200, 100);
+sunLight.castShadow = QUALITY.shadows;
+if (QUALITY.shadows) {
+  sunLight.shadow.mapSize.width = QUALITY.shadowMapSize;
+  sunLight.shadow.mapSize.height = QUALITY.shadowMapSize;
   sunLight.shadow.camera.near = 1;
-  sunLight.shadow.camera.far = 700;
-  sunLight.shadow.camera.left = -180;
-  sunLight.shadow.camera.right = 180;
-  sunLight.shadow.camera.top = 180;
-  sunLight.shadow.camera.bottom = -180;
-  sunLight.shadow.bias = -0.0003;
-  sunLight.shadow.normalBias = 0.02;
+  sunLight.shadow.camera.far = 300;
+  sunLight.shadow.camera.left = -60;
+  sunLight.shadow.camera.right = 60;
+  sunLight.shadow.camera.top = 60;
+  sunLight.shadow.camera.bottom = -60;
+  sunLight.shadow.bias = -0.001;
 }
 scene.add(sunLight);
 scene.add(sunLight.target);
 
-const ambientLight = new THREE.AmbientLight(0x8899bb, 1.0);
-scene.add(ambientLight);
-
-const hemiLight = new THREE.HemisphereLight(0x87CEEB, 0x3a4a3a, 1.2);
-scene.add(hemiLight);
+scene.add(new THREE.AmbientLight(0x8899bb, 1.3));
+scene.add(new THREE.HemisphereLight(0x87CEEB, 0x3a4a3a, 1.0));
 
 /* ============================================================
    واجهة المستخدم
@@ -139,104 +147,107 @@ const UI = {
   endDeliveries: document.getElementById('endDeliveries'),
   endRating: document.getElementById('endRating'),
   
-  updateLoading(pct, text) {
+  updateLoading: function(pct, text) {
     this.loadingFill.style.width = pct + '%';
     if (text) this.loadingText.textContent = text;
   },
   
-  showToast(message, duration) {
+  showToast: function(message, duration) {
     duration = duration || 1800;
     this.toast.textContent = message;
     this.toast.classList.add('show');
     clearTimeout(this._toastTimer);
-    this._toastTimer = setTimeout(() => {
-      this.toast.classList.remove('show');
+    var self = this;
+    this._toastTimer = setTimeout(function() {
+      self.toast.classList.remove('show');
     }, duration);
   },
   
-  showHint(text, duration) {
+  showHint: function(text, duration) {
     duration = duration || 5000;
     this.hint.textContent = text;
     this.hint.classList.remove('hidden');
     clearTimeout(this._hintTimer);
+    var self = this;
     if (duration > 0) {
-      this._hintTimer = setTimeout(() => {
-        this.hint.classList.add('hidden');
+      this._hintTimer = setTimeout(function() {
+        self.hint.classList.add('hidden');
       }, duration);
     }
   },
-  
-  hideHint() {
-    this.hint.classList.add('hidden');
-  },
 };
 
 /* ============================================================
-   أدوات مساعدة
+   أدوات
    ============================================================ */
 const Utils = {
-  rand(min, max) { return Math.random() * (max - min) + min; },
-  pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; },
-  formatTime(seconds) {
-    const m = Math.floor(Math.max(0, seconds) / 60);
-    const s = Math.floor(Math.max(0, seconds) % 60);
+  rand: function(min, max) { return Math.random() * (max - min) + min; },
+  pick: function(arr) { return arr[Math.floor(Math.random() * arr.length)]; },
+  formatTime: function(seconds) {
+    var m = Math.floor(Math.max(0, seconds) / 60);
+    var s = Math.floor(Math.max(0, seconds) % 60);
     return String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
   },
-  clamp(val, min, max) { return Math.max(min, Math.min(max, val)); },
+  clamp: function(val, min, max) { return Math.max(min, Math.min(max, val)); },
 };
 
 /* ============================================================
-   المواد المشتركة
+   المواد المشتركة (لتحسين الأداء)
    ============================================================ */
-const MATERIALS = {
-  road: new THREE.MeshStandardMaterial({ color: COLORS.road, roughness: 0.95, metalness: 0.05 }),
-  sidewalk: new THREE.MeshStandardMaterial({ color: COLORS.sidewalk, roughness: 0.9 }),
+const MAT = {
+  road: new THREE.MeshLambertMaterial({ color: 0x3a3a3a }),
+  sidewalk: new THREE.MeshLambertMaterial({ color: 0x909090 }),
   roadMark: new THREE.MeshBasicMaterial({ color: 0xffcc00 }),
-  treeTrunk: new THREE.MeshStandardMaterial({ color: 0x5a3a20, roughness: 1 }),
-  treeLeaf: new THREE.MeshStandardMaterial({ color: 0x2d5a2d, roughness: 1 }),
-  treeLeafDark: new THREE.MeshStandardMaterial({ color: 0x1d4a1d, roughness: 1 }),
-  palmTrunk: new THREE.MeshStandardMaterial({ color: 0x8b6a3a, roughness: 1 }),
-  palmLeaf: new THREE.MeshStandardMaterial({ color: 0x3a7a3a, roughness: 0.9, side: THREE.DoubleSide }),
-  streetLightPole: new THREE.MeshStandardMaterial({ color: 0xcccccc, roughness: 0.4, metalness: 0.7 }),
-  streetLightLamp: new THREE.MeshStandardMaterial({ color: 0xffffee, emissive: 0xffee88, emissiveIntensity: 0.8 }),
+  treeTrunk: new THREE.MeshLambertMaterial({ color: 0x5a3a20 }),
+  treeLeaf: new THREE.MeshLambertMaterial({ color: 0x2d5a2d }),
+  palmTrunk: new THREE.MeshLambertMaterial({ color: 0x8b6a3a }),
+  palmLeaf: new THREE.MeshLambertMaterial({ color: 0x3a7a3a, side: THREE.DoubleSide }),
+  buildingWall: [
+    new THREE.MeshLambertMaterial({ color: 0xc9b8a8 }),
+    new THREE.MeshLambertMaterial({ color: 0xa8927a }),
+    new THREE.MeshLambertMaterial({ color: 0x8b7355 }),
+    new THREE.MeshLambertMaterial({ color: 0xb8a898 }),
+  ],
+  buildingRoof: new THREE.MeshLambertMaterial({ color: 0x5a4a3a }),
+  streetLightPole: new THREE.MeshLambertMaterial({ color: 0xcccccc }),
+  streetLightLamp: new THREE.MeshBasicMaterial({ color: 0xffffee }),
 };
 
 /* ============================================================
-   بيانات الشوارع
+   الشوارع الحقيقية
    ============================================================ */
 const ROADS_DATA = [
-  { name: 'شارع أحمد عرابي', x: 0, z: -15, width: CONFIG.roadWidth, length: CONFIG.citySize, rotation: 0, isMain: true },
-  { name: 'مدخل الكوبري الجديد', x: 700, z: 150, width: CONFIG.roadWidth * 0.9, length: 500, rotation: Math.PI / 2, isMain: true },
-  { name: 'شارع بورسعيد', x: 0, z: 25, width: CONFIG.roadWidth * 0.85, length: CONFIG.citySize, rotation: 0 },
-  { name: 'شارع الجيش', x: 300, z: 100, width: CONFIG.roadWidth * 0.8, length: 800, rotation: Math.PI / 2 },
-  { name: 'شارع الجمهورية', x: -400, z: 0, width: CONFIG.roadWidth * 0.75, length: 750, rotation: Math.PI / 2 },
-  { name: 'شارع جلال الدسوقي', x: -150, z: 500, width: CONFIG.roadWidth * 0.7, length: 700, rotation: Math.PI / 2 },
-  { name: 'شارع سيدي عبد القادر', x: -700, z: 100, width: CONFIG.roadWidth * 0.75, length: 500, rotation: Math.PI / 2 },
-  { name: 'شارع الحدائق', x: 100, z: 400, width: CONFIG.roadWidth * 0.65, length: 600, rotation: Math.PI / 2 },
-  { name: 'شارع المحور', x: 600, z: 400, width: CONFIG.roadWidth * 0.65, length: 500, rotation: Math.PI / 2 },
-  { name: 'شارع سيدي شحاته', x: -800, z: -400, width: 16, length: 400, rotation: 0 },
-  { name: 'شارع الرحمة', x: -200, z: -500, width: 16, length: 300, rotation: 0 },
-  { name: 'شارع مجمع المحاكم', x: 500, z: -300, width: 16, length: 400, rotation: 0 },
-  { name: 'شارع صلاح الدين الأيوبي', x: 900, z: -500, width: 16, length: 300, rotation: 0 },
-  { name: 'شارع الإدكاوي', x: -600, z: 600, width: 16, length: 400, rotation: Math.PI / 2 },
-  { name: 'شارع العروبة', x: 200, z: 700, width: 16, length: 300, rotation: Math.PI / 2 },
-  { name: 'شارع النصر', x: 700, z: 600, width: 16, length: 400, rotation: Math.PI / 2 },
+  { x: 0, z: -15, width: 20, length: 1400, rotation: 0, isMain: true },
+  { x: 0, z: 25, width: 16, length: 1400, rotation: 0 },
+  { x: 250, z: 100, width: 16, length: 600, rotation: Math.PI / 2 },
+  { x: -300, z: 0, width: 15, length: 550, rotation: Math.PI / 2 },
+  { x: -100, z: 400, width: 14, length: 500, rotation: Math.PI / 2 },
+  { x: -500, z: 100, width: 15, length: 400, rotation: Math.PI / 2 },
+  { x: 100, z: 300, width: 13, length: 450, rotation: Math.PI / 2 },
+  { x: 450, z: 300, width: 13, length: 400, rotation: Math.PI / 2 },
+  { x: -600, z: -300, width: 14, length: 300, rotation: 0 },
+  { x: -200, z: -350, width: 14, length: 250, rotation: 0 },
+  { x: 400, z: -200, width: 14, length: 300, rotation: 0 },
+  { x: 700, z: -400, width: 14, length: 250, rotation: 0 },
+  { x: -450, z: 500, width: 13, length: 300, rotation: Math.PI / 2 },
+  { x: 150, z: 550, width: 13, length: 250, rotation: Math.PI / 2 },
+  { x: 550, z: 450, width: 13, length: 300, rotation: Math.PI / 2 },
 ];
 
 /* ============================================================
-   الوجهات الحقيقية
+   الوجهات الحقيقية لكفر الدوار
    ============================================================ */
 const DESTINATIONS_DATA = [
-  { name: 'محطة قطار كفر الدوار', x: -350, z: -50, color: 0x8b4513 },
-  { name: 'موقف عزيز المصري', x: 200, z: 80, color: 0xe74c3c },
-  { name: 'مجمع الميزانة', x: -150, z: -60, color: 0xf39c12 },
-  { name: 'مجمع السعرانية', x: 450, z: 100, color: 0xe67e22 },
-  { name: 'مستشفى كفر الدوار العام', x: -700, z: 150, color: 0x3498db },
-  { name: 'شركة مصر للغزل والنسيج', x: 500, z: -400, color: 0x95a5a6 },
-  { name: 'المسجد الكبير', x: -200, z: 250, color: 0x16a085 },
-  { name: 'سوق كفر الدوار التجاري', x: 100, z: 200, color: 0x9b59b6 },
-  { name: 'كورنيش ترعة المحمودية', x: 600, z: -20, color: 0x2980b9 },
-  { name: 'جامعة كفر الدوار', x: -500, z: -300, color: 0x8e44ad },
+  { name: 'محطة قطار كفر الدوار', x: -250, z: -40, color: 0x8b4513 },
+  { name: 'موقف عزيز المصري', x: 150, z: 60, color: 0xe74c3c },
+  { name: 'مجمع الميزانة', x: -120, z: -50, color: 0xf39c12 },
+  { name: 'مجمع السعرانية', x: 350, z: 80, color: 0xe67e22 },
+  { name: 'مستشفى كفر الدوار العام', x: -500, z: 120, color: 0x3498db },
+  { name: 'شركة مصر للغزل والنسيج', x: 400, z: -300, color: 0x95a5a6 },
+  { name: 'المسجد الكبير', x: -150, z: 200, color: 0x16a085 },
+  { name: 'سوق كفر الدوار التجاري', x: 80, z: 150, color: 0x9b59b6 },
+  { name: 'كورنيش ترعة المحمودية', x: 500, z: -18, color: 0x2980b9 },
+  { name: 'جامعة كفر الدوار', x: -400, z: -240, color: 0x8e44ad },
 ];
 
 /* ============================================================
@@ -250,26 +261,22 @@ const AudioSystem = {
   enabled: true,
   initialized: false,
   
-  init() {
+  init: function() {
     if (this.initialized) return;
     try {
-      const AC = window.AudioContext || window.webkitAudioContext;
+      var AC = window.AudioContext || window.webkitAudioContext;
       this.ctx = new AC();
       this.initialized = true;
-      console.log('🔊 نظام الصوت جاهز');
     } catch (e) {
-      console.warn('⚠️ فشل تشغيل الصوت:', e);
       this.enabled = false;
     }
   },
   
-  resume() {
-    if (this.ctx && this.ctx.state === 'suspended') {
-      this.ctx.resume();
-    }
+  resume: function() {
+    if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume();
   },
   
-  startEngine() {
+  startEngine: function() {
     if (!this.enabled || !this.ctx || this.engineOsc) return;
     try {
       this.engineOsc = this.ctx.createOscillator();
@@ -279,20 +286,18 @@ const AudioSystem = {
       this.engineFilter = this.ctx.createBiquadFilter();
       this.engineFilter.type = 'lowpass';
       this.engineFilter.frequency.value = 350;
-      this.engineFilter.Q.value = 5;
       
       this.engineGain = this.ctx.createGain();
-      this.engineGain.gain.value = 0.05;
+      this.engineGain.gain.value = 0.04;
       
       this.engineOsc.connect(this.engineFilter);
       this.engineFilter.connect(this.engineGain);
       this.engineGain.connect(this.ctx.destination);
-      
       this.engineOsc.start();
     } catch (e) {}
   },
   
-  stopEngine() {
+  stopEngine: function() {
     if (this.engineOsc) {
       try { this.engineOsc.stop(); } catch (e) {}
       this.engineOsc = null;
@@ -301,57 +306,39 @@ const AudioSystem = {
     }
   },
   
-  setEngine(on) {
-    if (on) {
-      this.resume();
-      this.startEngine();
-    } else {
-      this.stopEngine();
-    }
+  setEngine: function(on) {
+    if (on) { this.resume(); this.startEngine(); }
+    else { this.stopEngine(); }
   },
   
-  updateEngine(speed, maxSpeed, isAccelerating) {
+  updateEngine: function(speed, maxSpeed, isAccelerating) {
     if (!this.engineOsc || !this.engineGain || !this.ctx) return;
-    const ratio = Math.min(Math.abs(speed) / maxSpeed, 1);
-    const baseFreq = 55;
-    const maxFreq = 180;
-    
-    this.engineOsc.frequency.setTargetAtTime(
-      baseFreq + ratio * (maxFreq - baseFreq),
-      this.ctx.currentTime,
-      0.1
-    );
-    
-    const targetGain = 0.03 + ratio * 0.12 + (isAccelerating ? 0.03 : 0);
-    this.engineGain.gain.setTargetAtTime(targetGain, this.ctx.currentTime, 0.15);
-    
-    this.engineFilter.frequency.setTargetAtTime(
-      300 + ratio * 800,
-      this.ctx.currentTime,
-      0.1
-    );
+    var ratio = Math.min(Math.abs(speed) / maxSpeed, 1);
+    this.engineOsc.frequency.setTargetAtTime(55 + ratio * 125, this.ctx.currentTime, 0.1);
+    this.engineGain.gain.setTargetAtTime(0.03 + ratio * 0.1 + (isAccelerating ? 0.02 : 0), this.ctx.currentTime, 0.15);
   },
   
-  playPickup() {
+  playPickup: function() {
     if (!this.enabled || !this.ctx) return;
-    this._tone(600, 900, 0.15, 'sine', 0.15);
+    this._tone(600, 900, 0.15, 0.15);
   },
   
-  playDelivery() {
+  playDelivery: function() {
     if (!this.enabled || !this.ctx) return;
-    this._tone(523, 523, 0.1, 'sine', 0.15);
-    setTimeout(() => this._tone(659, 659, 0.1, 'sine', 0.15), 100);
-    setTimeout(() => this._tone(784, 784, 0.2, 'sine', 0.15), 200);
+    var self = this;
+    this._tone(523, 523, 0.1, 0.15);
+    setTimeout(function() { self._tone(659, 659, 0.1, 0.15); }, 100);
+    setTimeout(function() { self._tone(784, 784, 0.2, 0.15); }, 200);
   },
   
-  _tone(startFreq, endFreq, duration, type, volume) {
+  _tone: function(startFreq, endFreq, duration, volume) {
     try {
-      const osc = this.ctx.createOscillator();
-      const gain = this.ctx.createGain();
-      osc.type = type || 'sine';
+      var osc = this.ctx.createOscillator();
+      var gain = this.ctx.createGain();
+      osc.type = 'sine';
       osc.frequency.setValueAtTime(startFreq, this.ctx.currentTime);
       osc.frequency.exponentialRampToValueAtTime(endFreq, this.ctx.currentTime + duration);
-      gain.gain.setValueAtTime(volume || 0.15, this.ctx.currentTime);
+      gain.gain.setValueAtTime(volume, this.ctx.currentTime);
       gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + duration);
       osc.connect(gain);
       gain.connect(this.ctx.destination);
@@ -362,261 +349,193 @@ const AudioSystem = {
 };
 
 /* ============================================================
-   إنشاء الأرضية
+   الأرضية
    ============================================================ */
 function createGround() {
-  const groundGeo = new THREE.PlaneGeometry(6000, 6000, 1, 1);
-  const groundMat = new THREE.MeshStandardMaterial({
-    color: COLORS.ground, roughness: 1, metalness: 0,
-  });
-  const ground = new THREE.Mesh(groundGeo, groundMat);
+  var geo = new THREE.PlaneGeometry(4000, 4000);
+  var mat = new THREE.MeshLambertMaterial({ color: COLORS.ground });
+  var ground = new THREE.Mesh(geo, mat);
   ground.rotation.x = -Math.PI / 2;
-  ground.receiveShadow = true;
+  ground.receiveShadow = QUALITY.shadows;
   scene.add(ground);
-  return ground;
 }
 
 /* ============================================================
    ترعة المحمودية
    ============================================================ */
-let canalRef = null;
+var canalRef = null;
 function createCanal() {
-  const group = new THREE.Group();
-  group.name = 'canal';
+  var group = new THREE.Group();
   
-  const waterGeo = new THREE.PlaneGeometry(CONFIG.citySize * 1.2, CONFIG.canalWidth, 80, 8);
-  const waterMat = new THREE.MeshStandardMaterial({
-    color: COLORS.canal, roughness: 0.15, metalness: 0.65, transparent: true, opacity: 0.9,
-  });
-  const water = new THREE.Mesh(waterGeo, waterMat);
+  // الماء
+  var waterGeo = new THREE.PlaneGeometry(CONFIG.citySize * 1.2, CONFIG.canalWidth);
+  var waterMat = new THREE.MeshLambertMaterial({ color: COLORS.canal, transparent: true, opacity: 0.85 });
+  var water = new THREE.Mesh(waterGeo, waterMat);
   water.rotation.x = -Math.PI / 2;
-  water.position.y = -0.5;
-  water.receiveShadow = true;
+  water.position.y = -0.3;
   group.add(water);
-  group.userData.water = water;
-  group.userData.waterBasePositions = waterGeo.attributes.position.array.slice();
   
-  const bankMat = new THREE.MeshStandardMaterial({ color: 0x8b7355, roughness: 1 });
-  const bankGeo = new THREE.BoxGeometry(CONFIG.citySize * 1.2, 2, 4);
+  // الضفاف
+  var bankMat = new THREE.MeshLambertMaterial({ color: 0x8b7355 });
+  var bankGeo = new THREE.BoxGeometry(CONFIG.citySize * 1.2, 1.5, 3);
   
-  const northBank = new THREE.Mesh(bankGeo, bankMat);
-  northBank.position.set(0, 1, -(CONFIG.canalWidth / 2 + 2));
-  northBank.castShadow = true;
-  northBank.receiveShadow = true;
+  var northBank = new THREE.Mesh(bankGeo, bankMat);
+  northBank.position.set(0, 0.7, -(CONFIG.canalWidth / 2 + 1.5));
   group.add(northBank);
   
-  const southBank = new THREE.Mesh(bankGeo, bankMat);
-  southBank.position.set(0, 1, (CONFIG.canalWidth / 2 + 2));
-  southBank.castShadow = true;
-  southBank.receiveShadow = true;
+  var southBank = new THREE.Mesh(bankGeo, bankMat);
+  southBank.position.set(0, 0.7, (CONFIG.canalWidth / 2 + 1.5));
   group.add(southBank);
   
-  const railMat = new THREE.MeshStandardMaterial({ color: 0xeeeeee, roughness: 0.5, metalness: 0.4 });
-  
-  for (let side = -1; side <= 1; side += 2) {
-    for (let x = -CONFIG.citySize * 0.6; x < CONFIG.citySize * 0.6; x += 8) {
-      const postGeo = new THREE.CylinderGeometry(0.08, 0.08, 1.1);
-      const post = new THREE.Mesh(postGeo, railMat);
-      post.position.set(x, 1.55, side * (CONFIG.canalWidth / 2 + 3.8));
-      post.castShadow = true;
-      group.add(post);
-    }
-    const wireGeo = new THREE.BoxGeometry(CONFIG.citySize * 1.2, 0.06, 0.06);
-    const wire = new THREE.Mesh(wireGeo, railMat);
-    wire.position.set(0, 2.1, side * (CONFIG.canalWidth / 2 + 3.8));
-    wire.castShadow = true;
-    group.add(wire);
-  }
-  
-  // الجسر
-  const bridgeGeo = new THREE.BoxGeometry(30, 3, CONFIG.canalWidth + 20);
-  const bridgeMat = new THREE.MeshStandardMaterial({ color: 0x555555, roughness: 0.9 });
-  const bridge = new THREE.Mesh(bridgeGeo, bridgeMat);
-  bridge.position.set(0, 2, 0);
-  bridge.castShadow = true;
-  bridge.receiveShadow = true;
+  // الجسر (شارع أحمد عرابي)
+  var bridgeGeo = new THREE.BoxGeometry(26, 2.5, CONFIG.canalWidth + 16);
+  var bridgeMat = new THREE.MeshLambertMaterial({ color: 0x555555 });
+  var bridge = new THREE.Mesh(bridgeGeo, bridgeMat);
+  bridge.position.set(0, 1.5, 0);
+  bridge.receiveShadow = QUALITY.shadows;
   group.add(bridge);
   
-  for (let side = -1; side <= 1; side += 2) {
-    const railGeo = new THREE.BoxGeometry(2, 1.2, CONFIG.canalWidth + 20);
-    const rail = new THREE.Mesh(railGeo, railMat);
-    rail.position.set(side * 14, 3.6, 0);
-    rail.castShadow = true;
+  // درابزين الجسر
+  var railMat = new THREE.MeshLambertMaterial({ color: 0xdddddd });
+  for (var side = -1; side <= 1; side += 2) {
+    var railGeo = new THREE.BoxGeometry(1.5, 1, CONFIG.canalWidth + 16);
+    var rail = new THREE.Mesh(railGeo, railMat);
+    rail.position.set(side * 12, 3.2, 0);
     group.add(rail);
-  }
-  
-  const pillarGeo = new THREE.CylinderGeometry(1.5, 1.5, 8, 12);
-  const pillarMat = new THREE.MeshStandardMaterial({ color: 0x666666, roughness: 0.95 });
-  for (let side = -1; side <= 1; side += 2) {
-    for (let z = -1; z <= 1; z += 2) {
-      const pillar = new THREE.Mesh(pillarGeo, pillarMat);
-      pillar.position.set(side * 12, -2, z * (CONFIG.canalWidth / 2));
-      pillar.castShadow = true;
-      group.add(pillar);
-    }
   }
   
   scene.add(group);
   canalRef = group;
-  return group;
 }
 
 /* ============================================================
    الشوارع
    ============================================================ */
 function createRoads() {
-  const group = new THREE.Group();
-  group.name = 'roads';
+  var group = new THREE.Group();
   
-  ROADS_DATA.forEach(function(roadData) {
-    const x = roadData.x;
-    const z = roadData.z;
-    const width = roadData.width;
-    const length = roadData.length;
-    const rotation = roadData.rotation || 0;
+  for (var i = 0; i < ROADS_DATA.length; i++) {
+    var rd = ROADS_DATA[i];
     
-    const roadGeo = new THREE.BoxGeometry(width, 0.2, length);
-    const road = new THREE.Mesh(roadGeo, MATERIALS.road);
-    road.position.set(x, 0.1, z);
-    road.rotation.y = rotation;
-    road.receiveShadow = true;
+    // الشارع
+    var roadGeo = new THREE.BoxGeometry(rd.width, 0.15, rd.length);
+    var road = new THREE.Mesh(roadGeo, MAT.road);
+    road.position.set(rd.x, 0.08, rd.z);
+    road.rotation.y = rd.rotation;
+    road.receiveShadow = QUALITY.shadows;
     group.add(road);
     
-    const sideGeo = new THREE.BoxGeometry(CONFIG.sidewalkWidth, 0.4, length);
+    // الأرصفة
+    var sideGeo = new THREE.BoxGeometry(CONFIG.sidewalkWidth, 0.3, rd.length);
     
-    for (let side = -1; side <= 1; side += 2) {
-      const sidewalk = new THREE.Mesh(sideGeo, MATERIALS.sidewalk);
-      const sideOffset = side * (width / 2 + CONFIG.sidewalkWidth / 2);
-      const dx = Math.cos(rotation) * sideOffset;
-      const dz = -Math.sin(rotation) * sideOffset;
-      sidewalk.position.set(x + dx, 0.3, z + dz);
-      sidewalk.rotation.y = rotation;
-      sidewalk.receiveShadow = true;
-      sidewalk.castShadow = true;
+    for (var side = -1; side <= 1; side += 2) {
+      var sidewalk = new THREE.Mesh(sideGeo, MAT.sidewalk);
+      var sideOffset = side * (rd.width / 2 + CONFIG.sidewalkWidth / 2);
+      var dx = Math.cos(rd.rotation) * sideOffset;
+      var dz = -Math.sin(rd.rotation) * sideOffset;
+      sidewalk.position.set(rd.x + dx, 0.22, rd.z + dz);
+      sidewalk.rotation.y = rd.rotation;
+      sidewalk.receiveShadow = QUALITY.shadows;
       group.add(sidewalk);
     }
     
-    if (width >= 18) {
-      const markCount = Math.floor(length / 25);
-      for (let i = 0; i < markCount; i++) {
-        const offset = -length / 2 + i * 25 + 12.5;
-        const markGeo = new THREE.BoxGeometry(0.35, 0.08, 10);
-        const mark = new THREE.Mesh(markGeo, MATERIALS.roadMark);
-        const mx = x + Math.sin(rotation) * offset;
-        const mz = z + Math.cos(rotation) * offset;
-        mark.position.set(mx, 0.22, mz);
-        mark.rotation.y = rotation;
+    // خطوط الطريق (للشوارع الكبيرة فقط)
+    if (rd.width >= 18 && !isLowEnd) {
+      var markCount = Math.floor(rd.length / 30);
+      for (var j = 0; j < markCount; j++) {
+        var offset = -rd.length / 2 + j * 30 + 15;
+        var markGeo = new THREE.BoxGeometry(0.3, 0.05, 8);
+        var mark = new THREE.Mesh(markGeo, MAT.roadMark);
+        var mx = rd.x + Math.sin(rd.rotation) * offset;
+        var mz = rd.z + Math.cos(rd.rotation) * offset;
+        mark.position.set(mx, 0.18, mz);
+        mark.rotation.y = rd.rotation;
         group.add(mark);
       }
     }
-  });
+  }
   
   scene.add(group);
-  return group;
 }
 
 /* ============================================================
    السكة الحديد
    ============================================================ */
 function createRailway() {
-  const group = new THREE.Group();
-  group.name = 'railway';
+  var group = new THREE.Group();
+  var railMat = new THREE.MeshLambertMaterial({ color: 0x808080 });
+  var railX = -250;
   
-  const railMat = new THREE.MeshStandardMaterial({ color: 0x808080, metalness: 0.9, roughness: 0.35 });
-  const sleeperMat = new THREE.MeshStandardMaterial({ color: 0x4a3a2a, roughness: 1 });
-  const railX = -350;
-  
-  for (let side = -1; side <= 1; side += 2) {
-    const railGeo = new THREE.BoxGeometry(0.18, 0.35, CONFIG.citySize);
-    const rail = new THREE.Mesh(railGeo, railMat);
-    rail.position.set(railX + (side * 1.5), 0.55, 0);
-    rail.castShadow = true;
+  for (var side = -1; side <= 1; side += 2) {
+    var railGeo = new THREE.BoxGeometry(0.15, 0.3, CONFIG.citySize);
+    var rail = new THREE.Mesh(railGeo, railMat);
+    rail.position.set(railX + (side * 1.2), 0.4, 0);
     group.add(rail);
   }
   
-  const sleeperGeo = new THREE.BoxGeometry(4.2, 0.2, 0.35);
-  for (let z = -CONFIG.citySize / 2; z < CONFIG.citySize / 2; z += 2) {
-    const sleeper = new THREE.Mesh(sleeperGeo, sleeperMat);
-    sleeper.position.set(railX, 0.4, z);
-    sleeper.receiveShadow = true;
+  var sleeperMat = new THREE.MeshLambertMaterial({ color: 0x4a3a2a });
+  var sleeperGeo = new THREE.BoxGeometry(3.5, 0.15, 0.3);
+  for (var z = -CONFIG.citySize / 2; z < CONFIG.citySize / 2; z += 4) {
+    var sleeper = new THREE.Mesh(sleeperGeo, sleeperMat);
+    sleeper.position.set(railX, 0.28, z);
     group.add(sleeper);
   }
   
-  const gravelGeo = new THREE.BoxGeometry(6, 0.15, CONFIG.citySize);
-  const gravelMat = new THREE.MeshStandardMaterial({ color: 0x707070, roughness: 1 });
-  const gravel = new THREE.Mesh(gravelGeo, gravelMat);
-  gravel.position.set(railX, 0.3, 0);
-  gravel.receiveShadow = true;
-  group.add(gravel);
-  
   scene.add(group);
-  return group;
 }
 
 /* ============================================================
-   الأشجار والنخيل
+   الأشجار والنخيل (كمية محدودة)
    ============================================================ */
 function createTree(x, z, scale) {
-  scale = scale || 1;
-  const tree = new THREE.Group();
-  const trunkGeo = new THREE.CylinderGeometry(0.2 * scale, 0.28 * scale, 2.5 * scale, 6);
-  const trunk = new THREE.Mesh(trunkGeo, MATERIALS.treeTrunk);
-  trunk.position.y = 1.25 * scale;
-  trunk.castShadow = true;
+  var tree = new THREE.Group();
+  
+  var trunk = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.15 * scale, 0.2 * scale, 2 * scale, 5),
+    MAT.treeTrunk
+  );
+  trunk.position.y = 1 * scale;
   tree.add(trunk);
   
-  const leafMat = Math.random() > 0.5 ? MATERIALS.treeLeaf : MATERIALS.treeLeafDark;
-  const leaf1 = new THREE.Mesh(new THREE.SphereGeometry(1.2 * scale, 8, 6), leafMat);
-  leaf1.position.y = 3 * scale;
-  leaf1.castShadow = true;
-  tree.add(leaf1);
-  
-  const leaf2 = new THREE.Mesh(new THREE.SphereGeometry(1 * scale, 8, 6), leafMat);
-  leaf2.position.set(0.5 * scale, 3.6 * scale, 0.3 * scale);
-  leaf2.castShadow = true;
-  tree.add(leaf2);
+  var leaf = new THREE.Mesh(
+    new THREE.SphereGeometry(1.1 * scale, 6, 5),
+    MAT.treeLeaf
+  );
+  leaf.position.y = 2.5 * scale;
+  tree.add(leaf);
   
   tree.position.set(x, 0, z);
+  if (QUALITY.shadows) {
+    leaf.castShadow = true;
+  }
   return tree;
 }
 
 function createPalm(x, z, scale) {
-  scale = scale || 1;
-  const palm = new THREE.Group();
-  const segments = 5;
-  const trunkHeight = 6 * scale;
-  let prevY = 0;
-  let prevX = 0;
+  var palm = new THREE.Group();
   
-  for (let i = 0; i < segments; i++) {
-    const segHeight = trunkHeight / segments;
-    const segGeo = new THREE.CylinderGeometry(
-      0.15 * scale * (1 - i * 0.05),
-      0.2 * scale * (1 - i * 0.05),
-      segHeight, 8
+  // الجذع
+  var trunk = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.13 * scale, 0.18 * scale, 5 * scale, 6),
+    MAT.palmTrunk
+  );
+  trunk.position.y = 2.5 * scale;
+  palm.add(trunk);
+  
+  // الأوراق (5 بس لتخفيف الأداء)
+  for (var i = 0; i < 5; i++) {
+    var angle = (i / 5) * Math.PI * 2;
+    var leaf = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.7 * scale, 2.5 * scale),
+      MAT.palmLeaf
     );
-    const seg = new THREE.Mesh(segGeo, MATERIALS.palmTrunk);
-    const y = prevY + segHeight / 2;
-    const bendX = Math.sin(i * 0.3) * 0.15 * scale * i;
-    seg.position.set(bendX, y, 0);
-    seg.castShadow = true;
-    palm.add(seg);
-    prevY = y + segHeight / 2;
-    prevX = bendX;
-  }
-  
-  for (let i = 0; i < 7; i++) {
-    const angle = (i / 7) * Math.PI * 2;
-    const leafGeo = new THREE.PlaneGeometry(0.8 * scale, 3 * scale);
-    const leaf = new THREE.Mesh(leafGeo, MATERIALS.palmLeaf);
     leaf.position.set(
-      prevX + Math.cos(angle) * 0.5 * scale,
-      prevY + 0.2 * scale,
-      Math.sin(angle) * 0.5 * scale
+      Math.cos(angle) * 0.4 * scale,
+      5 * scale,
+      Math.sin(angle) * 0.4 * scale
     );
     leaf.rotation.z = Math.PI / 2.2;
     leaf.rotation.y = angle;
-    leaf.castShadow = true;
     palm.add(leaf);
   }
   
@@ -625,569 +544,347 @@ function createPalm(x, z, scale) {
 }
 
 function createFoliage() {
-  const group = new THREE.Group();
-  group.name = 'foliage';
+  if (!QUALITY.enableFoliage) return;
   
-  for (let x = -CONFIG.citySize * 0.55; x < CONFIG.citySize * 0.55; x += 30) {
-    if (Math.random() > 0.4) {
-      group.add(createPalm(x + Utils.rand(-5, 5), -(CONFIG.canalWidth / 2 + 6), Utils.rand(0.85, 1.15)));
+  var group = new THREE.Group();
+  
+  // نخيل على ضفاف الترعة
+  var palmStep = isLowEnd ? 60 : 40;
+  for (var x = -CONFIG.citySize * 0.55; x < CONFIG.citySize * 0.55; x += palmStep) {
+    if (Math.random() > 0.5) {
+      group.add(createPalm(x + Utils.rand(-5, 5), -(CONFIG.canalWidth / 2 + 5), Utils.rand(0.9, 1.1)));
     }
-    if (Math.random() > 0.4) {
-      group.add(createPalm(x + Utils.rand(-5, 5), (CONFIG.canalWidth / 2 + 6), Utils.rand(0.85, 1.15)));
+    if (Math.random() > 0.5) {
+      group.add(createPalm(x + Utils.rand(-5, 5), (CONFIG.canalWidth / 2 + 5), Utils.rand(0.9, 1.1)));
     }
   }
   
-  ROADS_DATA.forEach(function(road) {
-    if (road.width < 16) return;
-    const treeCount = Math.floor(road.length / 40);
+  // أشجار على الشوارع
+  var treeCount = 0;
+  for (var i = 0; i < ROADS_DATA.length && treeCount < QUALITY.treeCount; i++) {
+    var road = ROADS_DATA[i];
+    if (road.width < 14) continue;
     
-    for (let i = 0; i < treeCount; i++) {
-      const offset = -road.length / 2 + i * 40 + 20;
+    var count = Math.floor(road.length / 60);
+    for (var j = 0; j < count && treeCount < QUALITY.treeCount; j++) {
+      var offset = -road.length / 2 + j * 60 + 30;
+      var side = Math.random() > 0.5 ? 1 : -1;
+      var sideOffset = side * (road.width / 2 + CONFIG.sidewalkWidth + 2);
+      var tx = road.x + Math.sin(road.rotation) * offset + Math.cos(road.rotation) * sideOffset;
+      var tz = road.z + Math.cos(road.rotation) * offset - Math.sin(road.rotation) * sideOffset;
       
-      for (let side = -1; side <= 1; side += 2) {
-        if (Math.random() < 0.3) continue;
-        const sideOffset = side * (road.width / 2 + CONFIG.sidewalkWidth + 2);
-        const tx = road.x + Math.sin(road.rotation) * offset + Math.cos(road.rotation) * sideOffset;
-        const tz = road.z + Math.cos(road.rotation) * offset - Math.sin(road.rotation) * sideOffset;
-        
-        if (Math.abs(tz) > CONFIG.canalWidth / 2 + 8) {
-          group.add(createTree(tx, tz, Utils.rand(0.85, 1.2)));
-        }
+      if (Math.abs(tz) > CONFIG.canalWidth / 2 + 7) {
+        group.add(createTree(tx, tz, Utils.rand(0.9, 1.2)));
+        treeCount++;
       }
     }
-  });
+  }
   
   scene.add(group);
-  return group;
 }
 
 /* ============================================================
-   أعمدة النور
+   المباني (بسيطة وسريعة)
    ============================================================ */
-function createStreetLight(x, z, rotation) {
-  const light = new THREE.Group();
-  
-  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.12, 6), MATERIALS.streetLightPole);
-  pole.position.y = 3;
-  pole.castShadow = true;
-  light.add(pole);
-  
-  const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 1.2), MATERIALS.streetLightPole);
-  arm.rotation.z = Math.PI / 2;
-  arm.position.set(0.6, 6, 0);
-  arm.castShadow = true;
-  light.add(arm);
-  
-  const lamp = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.15, 0.3), MATERIALS.streetLightLamp);
-  lamp.position.set(1.2, 5.95, 0);
-  light.add(lamp);
-  
-  light.position.set(x, 0, z);
-  light.rotation.y = rotation;
-  return light;
-}
-
-function createStreetLights() {
-  const group = new THREE.Group();
-  group.name = 'streetLights';
-  
-  ROADS_DATA.forEach(function(road) {
-    if (road.width < 14) return;
-    const count = Math.floor(road.length / 50);
-    
-    for (let i = 0; i < count; i++) {
-      const offset = -road.length / 2 + i * 50 + 25;
-      const sideOffset = road.width / 2 + CONFIG.sidewalkWidth - 0.5;
-      const side = i % 2 === 0 ? 1 : -1;
-      
-      const lx = road.x + Math.sin(road.rotation) * offset + Math.cos(road.rotation) * sideOffset * side;
-      const lz = road.z + Math.cos(road.rotation) * offset - Math.sin(road.rotation) * sideOffset * side;
-      
-      if (Math.abs(lz) > CONFIG.canalWidth / 2 + 6) {
-        group.add(createStreetLight(lx, lz, road.rotation + (side > 0 ? Math.PI : 0)));
-      }
-    }
-  });
-  
-  scene.add(group);
-  return group;
-}
-
-/* ============================================================
-   المباني
-   ============================================================ */
-function createBuilding(x, z, width, depth, height, type) {
-  const group = new THREE.Group();
-  
-  let color;
-  if (type === 'commercial') {
-    color = Utils.pick([0xccb89a, 0xd4c4a8, 0xbca888]);
-  } else {
-    color = Utils.pick([0xc9b8a8, 0xa8927a, 0x8b7355, 0xb8a898, 0xa89888]);
-  }
-  
-  const wallMat = new THREE.MeshStandardMaterial({ color: color, roughness: 0.85, metalness: 0.05 });
-  
-  const box = new THREE.Mesh(new THREE.BoxGeometry(width, height, depth), wallMat);
-  box.position.y = height / 2;
-  box.castShadow = true;
-  box.receiveShadow = true;
-  group.add(box);
-  
-  const roofMat = new THREE.MeshStandardMaterial({ color: 0x5a4a3a, roughness: 0.95 });
-  const roof = new THREE.Mesh(new THREE.BoxGeometry(width + 0.4, 0.3, depth + 0.4), roofMat);
-  roof.position.y = height + 0.15;
-  roof.castShadow = true;
-  group.add(roof);
-  
-  const windowMat = new THREE.MeshStandardMaterial({
-    color: 0x88ccff, emissive: 0x4477aa, emissiveIntensity: 0.4, roughness: 0.1, metalness: 0.5,
-  });
-  const windowFrameMat = new THREE.MeshStandardMaterial({ color: 0x333333, roughness: 0.8 });
-  
-  const floors = Math.max(1, Math.floor(height / 3));
-  const windowsPerFloor = Math.floor(width / 2.5);
-  
-  for (let face = -1; face <= 1; face += 2) {
-    for (let floor = 0; floor < floors; floor++) {
-      for (let w = 0; w < windowsPerFloor; w++) {
-        const frame = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.5, 0.15), windowFrameMat);
-        frame.position.set(-width / 2 + 1.5 + w * 2.5, 1.5 + floor * 3, (depth / 2) * face + 0.05 * face);
-        group.add(frame);
-        
-        const glass = new THREE.Mesh(new THREE.BoxGeometry(1, 1.3, 0.05), windowMat);
-        glass.position.set(-width / 2 + 1.5 + w * 2.5, 1.5 + floor * 3, (depth / 2) * face + 0.1 * face);
-        group.add(glass);
-      }
-    }
-  }
-  
-  const doorMat = new THREE.MeshStandardMaterial({ color: 0x4a2a1a, roughness: 0.7 });
-  const door = new THREE.Mesh(new THREE.BoxGeometry(1.4, 2.4, 0.15), doorMat);
-  door.position.set(0, 1.2, depth / 2 + 0.05);
-  group.add(door);
-  
-  group.position.set(x, 0, z);
-  return group;
-}
-
 function isOnRoad(x, z, padding) {
   padding = padding || 0;
-  for (let i = 0; i < ROADS_DATA.length; i++) {
-    const road = ROADS_DATA[i];
-    const halfW = road.width / 2 + CONFIG.sidewalkWidth + padding;
-    const halfL = road.length / 2 + padding;
-    const dx = x - road.x;
-    const dz = z - road.z;
-    const cos = Math.cos(-road.rotation);
-    const sin = Math.sin(-road.rotation);
-    const localX = dx * cos - dz * sin;
-    const localZ = dx * sin + dz * cos;
+  for (var i = 0; i < ROADS_DATA.length; i++) {
+    var road = ROADS_DATA[i];
+    var halfW = road.width / 2 + CONFIG.sidewalkWidth + padding;
+    var halfL = road.length / 2 + padding;
+    var dx = x - road.x;
+    var dz = z - road.z;
+    var cos = Math.cos(-road.rotation);
+    var sin = Math.sin(-road.rotation);
+    var localX = dx * cos - dz * sin;
+    var localZ = dx * sin + dz * cos;
     if (Math.abs(localX) < halfW && Math.abs(localZ) < halfL) return true;
   }
   return false;
 }
 
 function createBuildings() {
-  const group = new THREE.Group();
-  group.name = 'buildings';
-  const gridSize = 50;
-  const halfCity = CONFIG.citySize / 2;
+  var group = new THREE.Group();
+  var gridSize = 45;
+  var halfCity = CONFIG.citySize / 2;
   
-  for (let gx = -halfCity; gx < halfCity; gx += gridSize) {
-    for (let gz = -halfCity; gz < halfCity; gz += gridSize) {
-      const x = gx + gridSize / 2;
-      const z = gz + gridSize / 2;
+  // استخدم InstancedMesh لو الجهاز ضعيف
+  var buildings = [];
+  
+  for (var gx = -halfCity; gx < halfCity; gx += gridSize) {
+    for (var gz = -halfCity; gz < halfCity; gz += gridSize) {
+      var x = gx + gridSize / 2;
+      var z = gz + gridSize / 2;
       
-      if (isOnRoad(x, z, 5)) continue;
-      if (Math.abs(z) < CONFIG.canalWidth / 2 + 10) continue;
-      if (Math.abs(x + 350) < 17) continue;
-      if (Math.abs(x) < 20 && Math.abs(z) < 25) continue;
-      if (Math.random() > 0.75) continue;
+      if (isOnRoad(x, z, 4)) continue;
+      if (Math.abs(z) < CONFIG.canalWidth / 2 + 8) continue;
+      if (Math.abs(x + 250) < 15) continue;
+      if (Math.abs(x) < 18 && Math.abs(z) < 22) continue;
+      if (Math.random() > QUALITY.buildingDensity) continue;
       
-      const width = Utils.rand(12, 22);
-      const depth = Utils.rand(12, 22);
-      const rand = Math.random();
-      let height, type;
+      var width = Utils.rand(10, 18);
+      var depth = Utils.rand(10, 18);
+      var height = Utils.rand(6, 18);
       
-      if (rand < 0.6) { height = Utils.rand(6, 14); type = 'residential'; }
-      else if (rand < 0.9) { height = Utils.rand(14, 24); type = 'residential'; }
-      else { height = Utils.rand(4, 8); type = 'commercial'; }
-      
-      group.add(createBuilding(x, z, width, depth, height, type));
+      buildings.push({ x: x, z: z, w: width, d: depth, h: height });
     }
+  }
+  
+  // استخدم InstancedMesh للمباني
+  var boxGeo = new THREE.BoxGeometry(1, 1, 1);
+  
+  // تجميع المباني حسب اللون
+  for (var c = 0; c < MAT.buildingWall.length; c++) {
+    var filtered = buildings.filter(function(b, idx) {
+      return idx % MAT.buildingWall.length === c;
+    });
+    
+    if (filtered.length === 0) continue;
+    
+    var instMesh = new THREE.InstancedMesh(boxGeo, MAT.buildingWall[c], filtered.length);
+    var matrix = new THREE.Matrix4();
+    
+    for (var i = 0; i < filtered.length; i++) {
+      var b = filtered[i];
+      matrix.makeScale(b.w, b.h, b.d);
+      matrix.setPosition(b.x, b.h / 2, b.z);
+      instMesh.setMatrixAt(i, matrix);
+    }
+    
+    instMesh.instanceMatrix.needsUpdate = true;
+    if (QUALITY.shadows) {
+      instMesh.castShadow = true;
+      instMesh.receiveShadow = true;
+    }
+    group.add(instMesh);
   }
   
   scene.add(group);
-  return group;
 }
 
 /* ============================================================
-   موجات الترعة
-   ============================================================ */
-function animateCanal(time) {
-  if (!canalRef || !canalRef.userData.water) return;
-  const water = canalRef.userData.water;
-  const basePositions = canalRef.userData.waterBasePositions;
-  const pos = water.geometry.attributes.position;
-  const t = time * 0.0008;
-  
-  for (let i = 0; i < pos.count; i++) {
-    const baseX = basePositions[i * 3];
-    const baseY = basePositions[i * 3 + 1];
-    const wave1 = Math.sin(baseX * 0.05 + t) * 0.25;
-    const wave2 = Math.cos(baseY * 0.1 + t * 1.3) * 0.15;
-    const wave3 = Math.sin((baseX + baseY) * 0.03 + t * 0.7) * 0.2;
-    pos.setZ(i, wave1 + wave2 + wave3);
-  }
-  pos.needsUpdate = true;
-  water.geometry.computeVertexNormals();
-}
-
-/* ============================================================
-   بناء المدينة
-   ============================================================ */
-async function buildCity(onProgress) {
-  const steps = [
-    { name: 'إنشاء الأرضية...', fn: createGround, weight: 5 },
-    { name: 'بناء ترعة المحمودية...', fn: createCanal, weight: 15 },
-    { name: 'رصف الشوارع...', fn: createRoads, weight: 20 },
-    { name: 'مد خط السكة الحديد...', fn: createRailway, weight: 10 },
-    { name: 'زراعة النخيل والأشجار...', fn: createFoliage, weight: 15 },
-    { name: 'ترك أعمدة النور...', fn: createStreetLights, weight: 10 },
-    { name: 'بناء المنازل والمحلات...', fn: createBuildings, weight: 25 },
-  ];
-  
-  let accumulated = 0;
-  const totalWeight = steps.reduce(function(sum, s) { return sum + s.weight; }, 0);
-  
-  for (let i = 0; i < steps.length; i++) {
-    const step = steps[i];
-    if (onProgress) onProgress(Math.round((accumulated / totalWeight) * 100), step.name);
-    
-    await new Promise(function(resolve) {
-      requestAnimationFrame(function() {
-        try { step.fn(); } catch (e) { console.error('خطأ في', step.name, e); }
-        resolve();
-      });
-    });
-    
-    accumulated += step.weight;
-  }
-  
-  if (onProgress) onProgress(100, 'جاهز للانطلاق! 🚀');
-}
-
-/* ============================================================
-   التوك توك
+   التوك توك (بسيط لكن جميل)
    ============================================================ */
 function createTukTuk() {
-  const tukTuk = new THREE.Group();
-  tukTuk.name = 'tukTuk';
-
-  const yellowBody = new THREE.MeshStandardMaterial({ color: 0xffc800, roughness: 0.35, metalness: 0.35 });
-  const yellowDark = new THREE.MeshStandardMaterial({ color: 0xe6a800, roughness: 0.4, metalness: 0.3 });
-  const blackPart = new THREE.MeshStandardMaterial({ color: 0x0a0a0a, roughness: 0.85, metalness: 0.1 });
-  const rubberMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.95, metalness: 0 });
-  const rimMat = new THREE.MeshStandardMaterial({ color: 0xdddddd, roughness: 0.2, metalness: 0.95 });
-  const chromeMat = new THREE.MeshStandardMaterial({ color: 0xcccccc, roughness: 0.15, metalness: 0.98 });
-  const headlightMat = new THREE.MeshStandardMaterial({ color: 0xffffcc, emissive: 0xffee88, emissiveIntensity: 1.2 });
-  const taillightMat = new THREE.MeshStandardMaterial({ color: 0xff2222, emissive: 0xcc0000, emissiveIntensity: 0.8 });
-  const seatMat = new THREE.MeshStandardMaterial({ color: 0x2a2a2a, roughness: 0.95 });
-  const glassMat = new THREE.MeshPhysicalMaterial({
-    color: 0xaaddff, roughness: 0.02, metalness: 0.05,
-    transmission: 0.92, transparent: true, opacity: 0.45, thickness: 0.05, ior: 1.5,
+  var tukTuk = new THREE.Group();
+  
+  var yellowBody = new THREE.MeshLambertMaterial({ color: 0xffc800 });
+  var yellowDark = new THREE.MeshLambertMaterial({ color: 0xe6a800 });
+  var blackPart = new THREE.MeshLambertMaterial({ color: 0x0a0a0a });
+  var rubberMat = new THREE.MeshLambertMaterial({ color: 0x1a1a1a });
+  var chromeMat = new THREE.MeshStandardMaterial({ color: 0xcccccc, roughness: 0.2, metalness: 0.9 });
+  var headlightMat = new THREE.MeshBasicMaterial({ color: 0xffffcc });
+  var taillightMat = new THREE.MeshBasicMaterial({ color: 0xff2222 });
+  var seatMat = new THREE.MeshLambertMaterial({ color: 0x2a2a2a });
+  var glassMat = new THREE.MeshLambertMaterial({
+    color: 0xaaddff, transparent: true, opacity: 0.4,
   });
-
-  // الهيكل
-  const chassis = new THREE.Mesh(new THREE.BoxGeometry(1.35, 0.12, 2.5), blackPart);
+  
+  // الهيكل السفلي
+  var chassis = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.12, 2.4), blackPart);
   chassis.position.y = 0.42;
-  chassis.castShadow = true;
+  if (QUALITY.shadows) chassis.castShadow = true;
   tukTuk.add(chassis);
-
-  const floorFront = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.08, 1.1), blackPart);
-  floorFront.position.set(0, 0.52, 0.7);
-  floorFront.castShadow = true;
-  tukTuk.add(floorFront);
-
-  const floorRear = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.08, 1.4), blackPart);
-  floorRear.position.set(0, 0.52, -0.65);
-  floorRear.castShadow = true;
-  tukTuk.add(floorRear);
-
+  
   // المقدمة
-  const frontPanel = new THREE.Mesh(new THREE.BoxGeometry(1.32, 0.85, 0.15), yellowBody);
-  frontPanel.position.set(0, 0.98, 1.28);
-  frontPanel.castShadow = true;
-  tukTuk.add(frontPanel);
-
-  const hood = new THREE.Mesh(new THREE.BoxGeometry(1.32, 0.08, 0.5), yellowDark);
-  hood.position.set(0, 1.42, 1.05);
-  hood.rotation.x = -0.08;
-  hood.castShadow = true;
-  tukTuk.add(hood);
-
-  const fender = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.25, 1.15), yellowBody);
-  fender.position.set(0, 0.72, 1.15);
-  fender.castShadow = true;
-  tukTuk.add(fender);
-
-  // المقصورة الأمامية
-  const frontCabin = new THREE.Mesh(new THREE.BoxGeometry(1.35, 0.95, 1.1), yellowBody);
-  frontCabin.position.set(0, 1.0, 0.7);
-  frontCabin.castShadow = true;
-  tukTuk.add(frontCabin);
-
-  // المقصورة الخلفية
-  const rearCabin = new THREE.Mesh(new THREE.BoxGeometry(1.4, 1.55, 1.5), yellowBody);
-  rearCabin.position.set(0, 1.28, -0.65);
-  rearCabin.castShadow = true;
-  tukTuk.add(rearCabin);
-
-  const stripe = new THREE.Mesh(new THREE.BoxGeometry(1.42, 0.08, 1.52), blackPart);
-  stripe.position.set(0, 1.35, -0.65);
-  tukTuk.add(stripe);
-
+  var frontBox = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.85, 1.1), yellowBody);
+  frontBox.position.set(0, 0.95, 0.65);
+  if (QUALITY.shadows) frontBox.castShadow = true;
+  tukTuk.add(frontBox);
+  
+  // الكابينة الخلفية
+  var rearBox = new THREE.Mesh(new THREE.BoxGeometry(1.35, 1.5, 1.4), yellowBody);
+  rearBox.position.set(0, 1.25, -0.6);
+  if (QUALITY.shadows) rearBox.castShadow = true;
+  tukTuk.add(rearBox);
+  
   // السقف
-  const roof = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.12, 2.7), blackPart);
-  roof.position.set(0, 2.15, 0);
-  roof.castShadow = true;
+  var roof = new THREE.Mesh(new THREE.BoxGeometry(1.45, 0.1, 2.6), blackPart);
+  roof.position.set(0, 2.1, 0);
+  if (QUALITY.shadows) roof.castShadow = true;
   tukTuk.add(roof);
-
-  const roofTrim = new THREE.Mesh(new THREE.BoxGeometry(1.52, 0.04, 2.72), chromeMat);
-  roofTrim.position.set(0, 2.09, 0);
-  tukTuk.add(roofTrim);
-
-  // الأعمدة
-  const pillarGeo = new THREE.CylinderGeometry(0.05, 0.05, 1.85, 8);
-  const pillarPositions = [
-    [-0.68, 1.25, -1.35], [0.68, 1.25, -1.35],
-    [-0.68, 1.25, -0.1], [0.68, 1.25, -0.1],
-    [-0.68, 1.25, 1.15], [0.68, 1.25, 1.15],
+  
+  // أعمدة السقف
+  var pillarGeo = new THREE.CylinderGeometry(0.04, 0.04, 1.8, 6);
+  var pillarPositions = [
+    [-0.65, 1.2, -1.25], [0.65, 1.2, -1.25],
+    [-0.65, 1.2, -0.05], [0.65, 1.2, -0.05],
+    [-0.65, 1.2, 1.1], [0.65, 1.2, 1.1],
   ];
-  pillarPositions.forEach(function(pos) {
-    const pillar = new THREE.Mesh(pillarGeo, blackPart);
-    pillar.position.set(pos[0], pos[1], pos[2]);
-    pillar.castShadow = true;
-    tukTuk.add(pillar);
-  });
-
-  // الزجاج
-  const windshield = new THREE.Mesh(new THREE.BoxGeometry(1.28, 0.9, 0.04), glassMat);
-  windshield.position.set(0, 1.88, 1.28);
+  for (var i = 0; i < pillarPositions.length; i++) {
+    var p = new THREE.Mesh(pillarGeo, blackPart);
+    p.position.set(pillarPositions[i][0], pillarPositions[i][1], pillarPositions[i][2]);
+    tukTuk.add(p);
+  }
+  
+  // الزجاج الأمامي
+  var windshield = new THREE.Mesh(new THREE.BoxGeometry(1.22, 0.85, 0.04), glassMat);
+  windshield.position.set(0, 1.85, 1.2);
   windshield.rotation.x = -0.1;
   tukTuk.add(windshield);
-
-  const sideGlassGeo = new THREE.BoxGeometry(0.04, 0.85, 1.0);
-  const sideGlassL = new THREE.Mesh(sideGlassGeo, glassMat);
-  sideGlassL.position.set(-0.69, 1.85, 0.7);
-  tukTuk.add(sideGlassL);
-
-  const sideGlassR = new THREE.Mesh(sideGlassGeo, glassMat);
-  sideGlassR.position.set(0.69, 1.85, 0.7);
-  tukTuk.add(sideGlassR);
-
-  const rearGlassSideGeo = new THREE.BoxGeometry(0.04, 1.0, 1.35);
-  const rearGlassL = new THREE.Mesh(rearGlassSideGeo, glassMat);
-  rearGlassL.position.set(-0.71, 1.75, -0.65);
-  tukTuk.add(rearGlassL);
-
-  const rearGlassR = new THREE.Mesh(rearGlassSideGeo, glassMat);
-  rearGlassR.position.set(0.71, 1.75, -0.65);
-  tukTuk.add(rearGlassR);
-
-  const rearWindow = new THREE.Mesh(new THREE.BoxGeometry(1.35, 1.05, 0.04), glassMat);
-  rearWindow.position.set(0, 1.75, -1.41);
-  tukTuk.add(rearWindow);
-
-  // الشبكة
-  const grillFrame = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.35, 0.06), chromeMat);
-  grillFrame.position.set(0, 1.0, 1.37);
-  tukTuk.add(grillFrame);
-
-  for (let i = 0; i < 5; i++) {
-    const slat = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.04, 0.04), blackPart);
-    slat.position.set(0, 0.88 + i * 0.06, 1.4);
-    tukTuk.add(slat);
+  
+  // الزجاج الجانبي
+  for (var side = -1; side <= 1; side += 2) {
+    var sideGlass = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.8, 0.95), glassMat);
+    sideGlass.position.set(side * 0.66, 1.8, 0.65);
+    tukTuk.add(sideGlass);
+    
+    var rearGlass = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.95, 1.25), glassMat);
+    rearGlass.position.set(side * 0.68, 1.7, -0.6);
+    tukTuk.add(rearGlass);
   }
-
+  
+  // الزجاج الخلفي
+  var rearWindow = new THREE.Mesh(new THREE.BoxGeometry(1.3, 1, 0.04), glassMat);
+  rearWindow.position.set(0, 1.7, -1.32);
+  tukTuk.add(rearWindow);
+  
   // المصابيح الأمامية
-  const headlightGeo = new THREE.CylinderGeometry(0.13, 0.13, 0.1, 20);
-  const hl1 = new THREE.Mesh(headlightGeo, chromeMat);
-  hl1.rotation.x = Math.PI / 2;
-  hl1.position.set(-0.48, 1.2, 1.35);
-  tukTuk.add(hl1);
-
-  const hl1Glass = new THREE.Mesh(headlightGeo, headlightMat);
-  hl1Glass.rotation.x = Math.PI / 2;
-  hl1Glass.position.set(-0.48, 1.2, 1.38);
-  tukTuk.add(hl1Glass);
-
-  const hl2 = new THREE.Mesh(headlightGeo, chromeMat);
-  hl2.rotation.x = Math.PI / 2;
-  hl2.position.set(0.48, 1.2, 1.35);
-  tukTuk.add(hl2);
-
-  const hl2Glass = new THREE.Mesh(headlightGeo, headlightMat);
-  hl2Glass.rotation.x = Math.PI / 2;
-  hl2Glass.position.set(0.48, 1.2, 1.38);
-  tukTuk.add(hl2Glass);
-
+  var headlightGeo = new THREE.CylinderGeometry(0.12, 0.12, 0.08, 12);
+  for (var side = -1; side <= 1; side += 2) {
+    var hl = new THREE.Mesh(headlightGeo, chromeMat);
+    hl.rotation.x = Math.PI / 2;
+    hl.position.set(side * 0.45, 1.15, 1.28);
+    tukTuk.add(hl);
+    
+    var hlg = new THREE.Mesh(headlightGeo, headlightMat);
+    hlg.rotation.x = Math.PI / 2;
+    hlg.position.set(side * 0.45, 1.15, 1.31);
+    tukTuk.add(hlg);
+  }
+  
   // الفوانيس الخلفية
-  const taillightGeo = new THREE.BoxGeometry(0.14, 0.22, 0.06);
-  const tl1 = new THREE.Mesh(taillightGeo, taillightMat);
-  tl1.position.set(-0.52, 0.95, -1.42);
-  tukTuk.add(tl1);
-
-  const tl2 = new THREE.Mesh(taillightGeo, taillightMat);
-  tl2.position.set(0.52, 0.95, -1.42);
-  tukTuk.add(tl2);
-
-  // لوحة الأرقام
-  const plateMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.5 });
-  const plate = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.16, 0.03), plateMat);
-  plate.position.set(0, 0.68, -1.43);
-  tukTuk.add(plate);
-
+  var taillightGeo = new THREE.BoxGeometry(0.12, 0.2, 0.05);
+  for (var side = -1; side <= 1; side += 2) {
+    var tl = new THREE.Mesh(taillightGeo, taillightMat);
+    tl.position.set(side * 0.5, 0.9, -1.33);
+    tukTuk.add(tl);
+  }
+  
   // المقود
-  const steeringGroup = new THREE.Group();
-  const steeringRing = new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.022, 8, 24), blackPart);
+  var steeringGroup = new THREE.Group();
+  var steeringRing = new THREE.Mesh(new THREE.TorusGeometry(0.15, 0.02, 6, 16), blackPart);
   steeringGroup.add(steeringRing);
-
-  for (let i = 0; i < 3; i++) {
-    const spoke = new THREE.Mesh(new THREE.BoxGeometry(0.025, 0.15, 0.02), blackPart);
+  for (var i = 0; i < 3; i++) {
+    var spoke = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.14, 0.015), blackPart);
     spoke.rotation.z = (i / 3) * Math.PI * 2;
     steeringGroup.add(spoke);
   }
-
-  const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.04), blackPart);
-  hub.rotation.x = Math.PI / 2;
-  steeringGroup.add(hub);
-
-  const column = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.35), blackPart);
-  column.rotation.x = -0.55;
-  column.position.set(0, -0.14, 0.12);
-  steeringGroup.add(column);
-
-  steeringGroup.position.set(0, 1.55, 0.9);
+  steeringGroup.position.set(0, 1.5, 0.85);
   steeringGroup.rotation.x = -0.35;
   tukTuk.add(steeringGroup);
-
-  // لوحة القيادة
-  const dashMat = new THREE.MeshStandardMaterial({ color: 0x151515, roughness: 0.9 });
-  const dashboard = new THREE.Mesh(new THREE.BoxGeometry(1.25, 0.22, 0.35), dashMat);
-  dashboard.position.set(0, 1.32, 1.08);
-  dashboard.castShadow = true;
-  tukTuk.add(dashboard);
-
-  // المقاعد
-  const seatDriver = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.12, 0.5), seatMat);
-  seatDriver.position.set(0, 0.8, 0.4);
-  seatDriver.castShadow = true;
-  tukTuk.add(seatDriver);
-
-  const backDriver = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.55, 0.08), seatMat);
-  backDriver.position.set(0, 1.12, 0.16);
-  backDriver.castShadow = true;
-  tukTuk.add(backDriver);
-
-  const rearSeat = new THREE.Mesh(new THREE.BoxGeometry(1.25, 0.12, 0.55), seatMat);
-  rearSeat.position.set(0, 0.8, -0.75);
-  rearSeat.castShadow = true;
-  tukTuk.add(rearSeat);
-
-  const rearBack = new THREE.Mesh(new THREE.BoxGeometry(1.25, 0.65, 0.08), seatMat);
-  rearBack.position.set(0, 1.18, -1.05);
-  rearBack.castShadow = true;
-  tukTuk.add(rearBack);
-
-  // العجلات
-  const wheels = [];
   
-  function createWheel(x, z, isFront) {
-    const wheelGroup = new THREE.Group();
-    wheelGroup.userData.isFront = isFront;
-
-    const tire = new THREE.Mesh(new THREE.TorusGeometry(0.26, 0.11, 12, 24), rubberMat);
+  // لوحة القيادة
+  var dashboard = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.2, 0.3), blackPart);
+  dashboard.position.set(0, 1.3, 1.0);
+  tukTuk.add(dashboard);
+  
+  // المقاعد
+  var seatDriver = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.1, 0.45), seatMat);
+  seatDriver.position.set(0, 0.78, 0.35);
+  tukTuk.add(seatDriver);
+  
+  var rearSeat = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.1, 0.5), seatMat);
+  rearSeat.position.set(0, 0.78, -0.7);
+  tukTuk.add(rearSeat);
+  
+  // العجلات
+  var wheels = [];
+  
+  function makeWheel(x, z, isFront) {
+    var wg = new THREE.Group();
+    wg.userData.isFront = isFront;
+    
+    var tire = new THREE.Mesh(new THREE.TorusGeometry(0.24, 0.1, 8, 16), rubberMat);
     tire.rotation.y = Math.PI / 2;
-    tire.castShadow = true;
-    wheelGroup.add(tire);
-
-    const rim = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.17, 0.13, 12), rimMat);
+    if (QUALITY.shadows) tire.castShadow = true;
+    wg.add(tire);
+    
+    var rim = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.12, 8), chromeMat);
     rim.rotation.z = Math.PI / 2;
-    rim.castShadow = true;
-    wheelGroup.add(rim);
-
-    for (let i = 0; i < 5; i++) {
-      const bolt = new THREE.Mesh(new THREE.SphereGeometry(0.025, 6, 6), blackPart);
-      const angle = (i / 5) * Math.PI * 2;
-      bolt.position.set(0, Math.cos(angle) * 0.08, Math.sin(angle) * 0.08);
-      wheelGroup.add(bolt);
-    }
-
-    wheelGroup.position.set(x, 0.26, z);
-    tukTuk.add(wheelGroup);
-    wheels.push(wheelGroup);
-    return wheelGroup;
+    wg.add(rim);
+    
+    wg.position.set(x, 0.24, z);
+    tukTuk.add(wg);
+    wheels.push(wg);
+    return wg;
   }
-
-  const frontWheel = createWheel(0, 1.25, true);
-  createWheel(-0.68, -0.85, false);
-  createWheel(0.68, -0.85, false);
-
-  // الإضاءة الفعلية
-  const headlight = new THREE.SpotLight(0xfff5cc, 4, 35, Math.PI / 5, 0.4, 1.5);
-  headlight.position.set(0, 1.2, 1.3);
-  headlight.target.position.set(0, 0.3, 15);
-  tukTuk.add(headlight);
-  tukTuk.add(headlight.target);
-
+  
+  makeWheel(0, 1.15, true);
+  makeWheel(-0.62, -0.8, false);
+  makeWheel(0.62, -0.8, false);
+  
   tukTuk.userData = {
     wheels: wheels,
-    frontWheel: frontWheel,
     steeringWheel: steeringGroup,
-    headlight: headlight,
   };
-
+  
   return tukTuk;
 }
 
-const tukTuk = createTukTuk();
-tukTuk.position.set(0, 0, 200);
-tukTuk.rotation.y = 0;
+var tukTuk = createTukTuk();
+tukTuk.position.set(0, 0, 150);
 scene.add(tukTuk);
 
 /* ============================================================
    حالة اللاعب
    ============================================================ */
-const player = {
+var player = {
   speed: 0,
-  maxSpeed: CONFIG.maxSpeed,
-  maxReverseSpeed: CONFIG.maxReverseSpeed,
-  acceleration: CONFIG.acceleration,
-  braking: CONFIG.braking,
-  friction: CONFIG.friction,
   steering: 0,
   currentWheelAngle: 0,
-  isLocked: false,
   engineOn: true,
   handbrake: false,
-  headYaw: 0,
-  headPitch: 0,
   hasPassenger: false,
   currentPassenger: null,
+  tripStartTime: 0,
 };
 
-const CAMERA_OFFSET = new THREE.Vector3(0, 1.55, 0.15);
+/* ============================================================
+   كاميرا الشخص الثالث (خلف التوك توك)
+   ============================================================ */
+var cameraOffset = {
+  distance: 7,        // المسافة خلف التوك توك
+  height: 3.5,        // الارتفاع
+  lookAtHeight: 1.2,  // نقطة النظر
+  currentPos: new THREE.Vector3(0, 3.5, 7),
+};
+
+function updateCamera(dt) {
+  // حساب موقع الكاميرا المثالي (خلف التوك توك)
+  var forward = new THREE.Vector3(
+    Math.sin(tukTuk.rotation.y),
+    0,
+    Math.cos(tukTuk.rotation.y)
+  );
+  
+  var targetPos = tukTuk.position.clone()
+    .sub(forward.multiplyScalar(cameraOffset.distance))
+    .add(new THREE.Vector3(0, cameraOffset.height, 0));
+  
+  // تحرك ناعم
+  var smoothFactor = 1 - Math.pow(0.001, dt);
+  camera.position.lerp(targetPos, smoothFactor);
+  
+  // نقطة النظر (فوق التوك توك)
+  var lookTarget = tukTuk.position.clone();
+  lookTarget.y += cameraOffset.lookAtHeight;
+  
+  camera.lookAt(lookTarget);
+  
+  // إمالة بسيطة عند الدوران
+  var speedRatio = Math.min(Math.abs(player.speed) / CONFIG.maxSpeed, 1);
+  camera.rotation.z = -player.steering * 0.03 * speedRatio;
+}
 
 /* ============================================================
    المدخلات
    ============================================================ */
-const keys = {};
+var keys = {};
 
 document.addEventListener('keydown', function(e) {
   keys[e.code] = true;
-  if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Tab'].indexOf(e.code) !== -1) {
+  if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].indexOf(e.code) !== -1) {
     e.preventDefault();
   }
   if (e.code === 'Space') player.handbrake = true;
@@ -1195,10 +892,6 @@ document.addEventListener('keydown', function(e) {
     player.engineOn = !player.engineOn;
     AudioSystem.setEngine(player.engineOn);
     UI.showToast(player.engineOn ? '🔊 المحرك شغّال' : '🔇 المحرك مطفأ', 1000);
-  }
-  if (e.code === 'KeyR') {
-    player.headYaw = 0;
-    player.headPitch = 0;
   }
 });
 
@@ -1208,29 +901,9 @@ document.addEventListener('keyup', function(e) {
 });
 
 /* ============================================================
-   Pointer Lock للماوس
+   أزرار الموبايل
    ============================================================ */
-let isPointerLocked = false;
-
-function setupPointerLock() {
-  if (isMobile) return;
-  document.addEventListener('pointerlockchange', function() {
-    isPointerLocked = document.pointerLockElement === renderer.domElement;
-    player.isLocked = isPointerLocked;
-  });
-  document.addEventListener('mousemove', function(e) {
-    if (!isPointerLocked) return;
-    player.headYaw -= e.movementX * 0.002;
-    player.headPitch -= e.movementY * 0.002;
-    player.headYaw = Utils.clamp(player.headYaw, -Math.PI * 0.75, Math.PI * 0.75);
-    player.headPitch = Utils.clamp(player.headPitch, -0.55, 0.45);
-  });
-}
-
-/* ============================================================
-   مدخلات اللمس
-   ============================================================ */
-const mobileInput = {
+var mobileInput = {
   accel: false,
   brake: false,
   left: false,
@@ -1238,7 +911,7 @@ const mobileInput = {
 };
 
 function setupMobileButtons() {
-  const buttons = {
+  var buttons = {
     btnAccel: 'accel',
     btnBrake: 'brake',
     btnSteerLeft: 'left',
@@ -1246,17 +919,17 @@ function setupMobileButtons() {
   };
   
   Object.keys(buttons).forEach(function(id) {
-    const el = document.getElementById(id);
+    var el = document.getElementById(id);
     if (!el) return;
-    const key = buttons[id];
+    var key = buttons[id];
     
-    const press = function(e) {
+    var press = function(e) {
       e.preventDefault();
       e.stopPropagation();
       mobileInput[key] = true;
       el.classList.add('pressed');
     };
-    const release = function(e) {
+    var release = function(e) {
       e.preventDefault();
       e.stopPropagation();
       mobileInput[key] = false;
@@ -1271,16 +944,15 @@ function setupMobileButtons() {
     el.addEventListener('mouseleave', release);
   });
   
-  // زر فرملة اليد
-  const hbBtn = document.getElementById('btnHandbrake');
+  var hbBtn = document.getElementById('btnHandbrake');
   if (hbBtn) {
-    const hbPress = function(e) {
+    var hbPress = function(e) {
       e.preventDefault();
       e.stopPropagation();
       player.handbrake = true;
       hbBtn.classList.add('pressed');
     };
-    const hbRelease = function(e) {
+    var hbRelease = function(e) {
       e.preventDefault();
       e.stopPropagation();
       player.handbrake = false;
@@ -1291,47 +963,6 @@ function setupMobileButtons() {
     hbBtn.addEventListener('mousedown', hbPress);
     hbBtn.addEventListener('mouseup', hbRelease);
   }
-  
-  // السحب بإصبع للنظر
-  let touchLookId = null;
-  let touchLastX = 0;
-  let touchLastY = 0;
-  
-  renderer.domElement.addEventListener('touchstart', function(e) {
-    for (let i = 0; i < e.changedTouches.length; i++) {
-      const t = e.changedTouches[i];
-      const target = document.elementFromPoint(t.clientX, t.clientY);
-      if (!target || target.classList.contains('mobile-btn')) continue;
-      touchLookId = t.identifier;
-      touchLastX = t.clientX;
-      touchLastY = t.clientY;
-      break;
-    }
-  }, { passive: true });
-  
-  renderer.domElement.addEventListener('touchmove', function(e) {
-    for (let i = 0; i < e.changedTouches.length; i++) {
-      const t = e.changedTouches[i];
-      if (t.identifier === touchLookId) {
-        const dx = t.clientX - touchLastX;
-        const dy = t.clientY - touchLastY;
-        player.headYaw -= dx * 0.005;
-        player.headPitch -= dy * 0.005;
-        player.headYaw = Utils.clamp(player.headYaw, -Math.PI * 0.75, Math.PI * 0.75);
-        player.headPitch = Utils.clamp(player.headPitch, -0.55, 0.45);
-        touchLastX = t.clientX;
-        touchLastY = t.clientY;
-      }
-    }
-  }, { passive: true });
-  
-  renderer.domElement.addEventListener('touchend', function(e) {
-    for (let i = 0; i < e.changedTouches.length; i++) {
-      if (e.changedTouches[i].identifier === touchLookId) {
-        touchLookId = null;
-      }
-    }
-  }, { passive: true });
 }
 
 /* ============================================================
@@ -1339,10 +970,10 @@ function setupMobileButtons() {
    ============================================================ */
 function updateTukTukPhysics(dt) {
   if (!gameState.running || gameState.paused) return;
-
-  const throttle = (keys['KeyW'] || keys['ArrowUp'] || mobileInput.accel) ? 1 : 0;
-  const brake = (keys['KeyS'] || keys['ArrowDown'] || mobileInput.brake) ? 1 : 0;
-
+  
+  var throttle = (keys['KeyW'] || keys['ArrowUp'] || mobileInput.accel) ? 1 : 0;
+  var brake = (keys['KeyS'] || keys['ArrowDown'] || mobileInput.brake) ? 1 : 0;
+  
   if (!player.engineOn) {
     player.speed *= (1 - 3 * dt);
     if (Math.abs(player.speed) < 0.1) player.speed = 0;
@@ -1351,123 +982,84 @@ function updateTukTukPhysics(dt) {
     if (Math.abs(player.speed) < 0.1) player.speed = 0;
   } else {
     if (throttle && !brake) {
-      const accel = player.acceleration * (1 - Math.abs(player.speed) / player.maxSpeed * 0.4);
-      player.speed += accel * dt;
+      player.speed += CONFIG.acceleration * dt;
     } else if (brake && !throttle) {
       if (player.speed > 0.5) {
-        player.speed -= player.braking * dt;
+        player.speed -= CONFIG.braking * dt;
       } else {
-        player.speed -= player.acceleration * 0.6 * dt;
+        player.speed -= CONFIG.acceleration * 0.5 * dt;
       }
     } else {
       if (player.speed > 0) {
-        player.speed -= player.friction * dt * 4;
+        player.speed -= CONFIG.friction * dt * 3;
         if (player.speed < 0.05) player.speed = 0;
       } else if (player.speed < 0) {
-        player.speed += player.friction * dt * 4;
+        player.speed += CONFIG.friction * dt * 3;
         if (player.speed > -0.05) player.speed = 0;
       }
     }
-    player.speed = Utils.clamp(player.speed, -player.maxReverseSpeed, player.maxSpeed);
+    player.speed = Utils.clamp(player.speed, -CONFIG.maxReverseSpeed, CONFIG.maxSpeed);
   }
-
-  const leftInput = (keys['KeyA'] || keys['ArrowLeft'] || mobileInput.left) ? 1 : 0;
-  const rightInput = (keys['KeyD'] || keys['ArrowRight'] || mobileInput.right) ? 1 : 0;
-  const steerInput = rightInput - leftInput;
-
-  const steerDiff = steerInput - player.steering;
-  const steerStep = Math.sign(steerDiff) * Math.min(Math.abs(steerDiff), CONFIG.steeringSpeed * dt);
+  
+  var leftInput = (keys['KeyA'] || keys['ArrowLeft'] || mobileInput.left) ? 1 : 0;
+  var rightInput = (keys['KeyD'] || keys['ArrowRight'] || mobileInput.right) ? 1 : 0;
+  var steerInput = rightInput - leftInput;
+  
+  var steerDiff = steerInput - player.steering;
+  var steerStep = Math.sign(steerDiff) * Math.min(Math.abs(steerDiff), CONFIG.steeringSpeed * dt);
   player.steering += steerStep;
   player.steering = Utils.clamp(player.steering, -1, 1);
   if (steerInput === 0) player.steering *= (1 - 2 * dt);
-
-  const speedRatio = Math.min(Math.abs(player.speed) / player.maxSpeed, 1);
-  const maxAngle = CONFIG.maxWheelAngle * (1 - speedRatio * 0.55);
+  
+  var speedRatio = Math.min(Math.abs(player.speed) / CONFIG.maxSpeed, 1);
+  var maxAngle = CONFIG.maxWheelAngle * (1 - speedRatio * 0.55);
   player.currentWheelAngle = player.steering * maxAngle;
-
+  
   if (Math.abs(player.speed) > 0.1) {
-    const speedFactor = Math.min(Math.abs(player.speed) / 8, 1.2);
-    const direction = player.speed >= 0 ? 1 : -1;
-    const turnRate = player.currentWheelAngle * speedFactor * dt * 3.2 * direction;
+    var speedFactor = Math.min(Math.abs(player.speed) / 7, 1.2);
+    var direction = player.speed >= 0 ? 1 : -1;
+    var turnRate = player.currentWheelAngle * speedFactor * dt * 3 * direction;
     tukTuk.rotation.y -= turnRate;
   }
-
-  const forward = new THREE.Vector3(
+  
+  var forward = new THREE.Vector3(
     Math.sin(tukTuk.rotation.y), 0, Math.cos(tukTuk.rotation.y)
   );
-  const velocity = forward.clone().multiplyScalar(player.speed * dt);
-  const newPos = tukTuk.position.clone().add(velocity);
-
-  const inCanalX = !(newPos.x > -15 && newPos.x < 15);
-  const nearCanal = Math.abs(newPos.z) < CONFIG.canalWidth / 2 + 1.5;
+  var velocity = forward.multiplyScalar(player.speed * dt);
+  var newPos = tukTuk.position.clone().add(velocity);
+  
+  // تصادم مع الترعة
+  var inCanalX = !(newPos.x > -13 && newPos.x < 13);
+  var nearCanal = Math.abs(newPos.z) < CONFIG.canalWidth / 2 + 1.5;
   
   if (nearCanal && inCanalX) {
     player.speed *= -0.25;
-  } else if (Math.abs(newPos.x) < CONFIG.citySize / 2 - 5 && Math.abs(newPos.z) < CONFIG.citySize / 2 - 5) {
+  } else if (Math.abs(newPos.x) < CONFIG.citySize / 2 - 3 && Math.abs(newPos.z) < CONFIG.citySize / 2 - 3) {
     tukTuk.position.copy(newPos);
   } else {
     player.speed *= -0.3;
   }
-
-  const wheelRollSpeed = (player.speed * dt) / 0.28;
-  tukTuk.userData.wheels.forEach(function(wheel) {
-    const tire = wheel.children[0];
-    if (tire) tire.rotation.x += wheelRollSpeed;
-    if (wheel.children[1]) wheel.children[1].rotation.x += wheelRollSpeed;
-    if (wheel.userData.isFront) wheel.rotation.y = player.currentWheelAngle;
-  });
-
+  
+  // العجلات
+  var wheelRoll = (player.speed * dt) / 0.24;
+  for (var i = 0; i < tukTuk.userData.wheels.length; i++) {
+    var w = tukTuk.userData.wheels[i];
+    var tire = w.children[0];
+    if (tire) tire.rotation.x += wheelRoll;
+    if (w.userData.isFront) w.rotation.y = player.currentWheelAngle;
+  }
+  
+  // المقود
   tukTuk.userData.steeringWheel.rotation.z = -player.steering * Math.PI * 0.85;
-
-  let engineShake = 0;
-  if (player.engineOn) {
-    engineShake = Math.sin(performance.now() * 0.015) * 0.008 * (1 + speedRatio);
-  }
-  tukTuk.position.y = Math.max(0, engineShake);
-
-  const targetRoll = -player.steering * 0.06 * speedRatio;
-  tukTuk.rotation.z += (targetRoll - tukTuk.rotation.z) * 6 * dt;
-}
-
-/* ============================================================
-   الكاميرا
-   ============================================================ */
-function updateCamera(dt) {
-  const offset = CAMERA_OFFSET.clone();
-  offset.applyAxisAngle(new THREE.Vector3(0, 1, 0), tukTuk.rotation.y);
   
-  const targetPos = tukTuk.position.clone().add(offset);
-  targetPos.y += tukTuk.position.y;
-  
-  camera.position.lerp(targetPos, 1 - Math.pow(0.001, dt));
-  
-  const baseYaw = tukTuk.rotation.y + Math.PI;
-  const totalYaw = baseYaw + player.headYaw;
-  const totalPitch = player.headPitch;
-  
-  const lookDir = new THREE.Vector3(
-    Math.sin(totalYaw) * Math.cos(totalPitch),
-    Math.sin(totalPitch),
-    Math.cos(totalYaw) * Math.cos(totalPitch)
-  );
-  
-  const lookTarget = camera.position.clone().add(lookDir);
-  camera.lookAt(lookTarget);
-  
-  const sr = Math.min(Math.abs(player.speed) / player.maxSpeed, 1);
-  camera.rotation.z = -player.steering * 0.025 * sr;
-  
-  if (player.engineOn) {
-    const shake = 0.003 * (1 + sr);
-    camera.position.x += Math.sin(performance.now() * 0.02) * shake;
-    camera.position.y += Math.cos(performance.now() * 0.025) * shake;
-  }
+  // اهتزاز خفيف
+  tukTuk.position.y = Math.max(0, Math.sin(performance.now() * 0.02) * 0.005 * (1 + speedRatio));
 }
 
 /* ============================================================
    حالة اللعبة
    ============================================================ */
-const gameState = {
+var gameState = {
   running: false,
   paused: false,
   money: 0,
@@ -1482,94 +1074,74 @@ const gameState = {
 /* ============================================================
    الركاب
    ============================================================ */
-const passengers = [];
-let activeDestination = null;
+var passengers = [];
+var activeDestination = null;
 
 function getPassengerSpawnPoint() {
-  const candidates = [];
+  var candidates = [];
   
-  ROADS_DATA.forEach(function(road) {
-    if (road.width < 14) return;
-    const steps = Math.floor(road.length / 60);
+  for (var i = 0; i < ROADS_DATA.length; i++) {
+    var road = ROADS_DATA[i];
+    if (road.width < 14) continue;
     
-    for (let i = 0; i < steps; i++) {
-      const offset = -road.length / 2 + i * 60 + 30;
+    var steps = Math.floor(road.length / 80);
+    for (var j = 0; j < steps; j++) {
+      var offset = -road.length / 2 + j * 80 + 40;
+      var side = Math.random() > 0.5 ? 1 : -1;
+      var sideOffset = side * (road.width / 2 + CONFIG.sidewalkWidth / 2);
+      var x = road.x + Math.sin(road.rotation) * offset + Math.cos(road.rotation) * sideOffset;
+      var z = road.z + Math.cos(road.rotation) * offset - Math.sin(road.rotation) * sideOffset;
       
-      for (let side = -1; side <= 1; side += 2) {
-        const sideOffset = side * (road.width / 2 + CONFIG.sidewalkWidth / 2);
-        const x = road.x + Math.sin(road.rotation) * offset + Math.cos(road.rotation) * sideOffset;
-        const z = road.z + Math.cos(road.rotation) * offset - Math.sin(road.rotation) * sideOffset;
-        
-        if (Math.abs(z) < CONFIG.canalWidth / 2 + 5) continue;
-        if (Math.abs(x + 350) < 10) continue;
-        
-        const dist = Math.hypot(x - tukTuk.position.x, z - tukTuk.position.z);
-        if (dist < 80 || dist > 500) continue;
-        
-        candidates.push({ x: x, z: z });
-      }
+      if (Math.abs(z) < CONFIG.canalWidth / 2 + 4) continue;
+      if (Math.abs(x + 250) < 8) continue;
+      
+      var dist = Math.hypot(x - tukTuk.position.x, z - tukTuk.position.z);
+      if (dist < 60 || dist > 400) continue;
+      
+      candidates.push({ x: x, z: z });
     }
-  });
+  }
   
   if (candidates.length === 0) return null;
   return Utils.pick(candidates);
 }
 
 function createPassengerMesh() {
-  const group = new THREE.Group();
+  var group = new THREE.Group();
   
-  const shirtColors = [0xe74c3c, 0x3498db, 0x2ecc71, 0xf39c12, 0x9b59b6, 0xe67e22, 0x1abc9c, 0x34495e];
-  const pantsColors = [0x2c3e50, 0x34495e, 0x1a1a1a, 0x5a3a2a];
-  const skinColors = [0xf5d5b0, 0xe0b890, 0xc89870, 0x8d5524];
+  var shirtColors = [0xe74c3c, 0x3498db, 0x2ecc71, 0xf39c12, 0x9b59b6, 0xe67e22];
+  var skinColors = [0xf5d5b0, 0xe0b890, 0xc89870];
   
-  const shirtColor = Utils.pick(shirtColors);
-  const pantsColor = Utils.pick(pantsColors);
-  const skinColor = Utils.pick(skinColors);
+  var shirtColor = Utils.pick(shirtColors);
+  var skinColor = Utils.pick(skinColors);
   
-  const torsoMat = new THREE.MeshStandardMaterial({ color: shirtColor, roughness: 0.85 });
-  const torso = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.7, 0.3), torsoMat);
-  torso.position.y = 1.15;
-  torso.castShadow = true;
+  var torsoMat = new THREE.MeshLambertMaterial({ color: shirtColor });
+  var torso = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.65, 0.28), torsoMat);
+  torso.position.y = 1.1;
+  if (QUALITY.shadows) torso.castShadow = true;
   group.add(torso);
   
-  const headMat = new THREE.MeshStandardMaterial({ color: skinColor, roughness: 0.9 });
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.18, 12, 12), headMat);
-  head.position.y = 1.68;
-  head.castShadow = true;
+  var headMat = new THREE.MeshLambertMaterial({ color: skinColor });
+  var head = new THREE.Mesh(new THREE.SphereGeometry(0.16, 8, 8), headMat);
+  head.position.y = 1.6;
+  if (QUALITY.shadows) head.castShadow = true;
   group.add(head);
   
-  const pantsMat = new THREE.MeshStandardMaterial({ color: pantsColor, roughness: 0.9 });
-  const legs = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.8, 0.3), pantsMat);
+  var legsMat = new THREE.MeshLambertMaterial({ color: 0x2c3e50 });
+  var legs = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.75, 0.28), legsMat);
   legs.position.y = 0.4;
-  legs.castShadow = true;
+  if (QUALITY.shadows) legs.castShadow = true;
   group.add(legs);
   
-  const armGeo = new THREE.BoxGeometry(0.14, 0.65, 0.14);
-  const armL = new THREE.Mesh(armGeo, torsoMat);
-  armL.position.set(-0.32, 1.15, 0);
-  armL.castShadow = true;
-  group.add(armL);
-  
-  const armR = new THREE.Mesh(armGeo, torsoMat);
-  armR.position.set(0.32, 1.15, 0);
-  armR.castShadow = true;
-  group.add(armR);
-  
-  const ringMat = new THREE.MeshBasicMaterial({
-    color: 0x00ff88, transparent: true, opacity: 0.6, side: THREE.DoubleSide,
+  // هالة
+  var ringMat = new THREE.MeshBasicMaterial({
+    color: 0x00ff88, transparent: true, opacity: 0.7, side: THREE.DoubleSide,
   });
-  const ring = new THREE.Mesh(new THREE.RingGeometry(0.5, 0.7, 24), ringMat);
+  var ring = new THREE.Mesh(new THREE.RingGeometry(0.5, 0.75, 16), ringMat);
   ring.rotation.x = -Math.PI / 2;
   ring.position.y = 0.05;
   group.add(ring);
   group.userData.ring = ring;
-  
-  const arrowMat = new THREE.MeshBasicMaterial({ color: 0x00ff88 });
-  const arrow = new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.4, 4), arrowMat);
-  arrow.position.y = 2.3;
-  arrow.rotation.x = Math.PI;
-  group.add(arrow);
-  group.userData.arrow = arrow;
   
   return group;
 }
@@ -1578,19 +1150,18 @@ function spawnPassenger() {
   if (passengers.length >= CONFIG.maxPassengers) return;
   if (player.hasPassenger) return;
   
-  const spawnPoint = getPassengerSpawnPoint();
+  var spawnPoint = getPassengerSpawnPoint();
   if (!spawnPoint) return;
   
-  let destination;
-  let attempts = 0;
+  var destination;
+  var attempts = 0;
   do {
     destination = Utils.pick(DESTINATIONS_DATA);
     attempts++;
   } while (attempts < 10 && passengers.some(function(p) { return p.destination.name === destination.name; }));
   
-  const mesh = createPassengerMesh();
+  var mesh = createPassengerMesh();
   mesh.position.set(spawnPoint.x, 0, spawnPoint.z);
-  mesh.rotation.y = Math.random() * Math.PI * 2;
   scene.add(mesh);
   
   passengers.push({
@@ -1598,7 +1169,6 @@ function spawnPassenger() {
     x: spawnPoint.x,
     z: spawnPoint.z,
     destination: destination,
-    spawnTime: performance.now(),
     bobPhase: Math.random() * Math.PI * 2,
   });
   
@@ -1606,48 +1176,40 @@ function spawnPassenger() {
 }
 
 function createDestinationMarker(destination) {
-  const group = new THREE.Group();
+  var group = new THREE.Group();
   
-  const ringMat = new THREE.MeshBasicMaterial({
+  var ringMat = new THREE.MeshBasicMaterial({
     color: destination.color, transparent: true, opacity: 0.7, side: THREE.DoubleSide,
   });
-  const ring = new THREE.Mesh(new THREE.RingGeometry(2, 3, 32), ringMat);
+  var ring = new THREE.Mesh(new THREE.RingGeometry(2, 3, 24), ringMat);
   ring.rotation.x = -Math.PI / 2;
   ring.position.y = 0.1;
   group.add(ring);
   
-  const innerMat = new THREE.MeshBasicMaterial({
-    color: destination.color, transparent: true, opacity: 0.3, side: THREE.DoubleSide,
+  var beamMat = new THREE.MeshBasicMaterial({
+    color: destination.color, transparent: true, opacity: 0.25, side: THREE.DoubleSide,
   });
-  const inner = new THREE.Mesh(new THREE.CircleGeometry(1.5, 24), innerMat);
-  inner.rotation.x = -Math.PI / 2;
-  inner.position.y = 0.15;
-  group.add(inner);
-  
-  const beamMat = new THREE.MeshBasicMaterial({
-    color: destination.color, transparent: true, opacity: 0.2, side: THREE.DoubleSide,
-  });
-  const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 1.5, 8, 16, 1, true), beamMat);
+  var beam = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 1.5, 8, 12, 1, true), beamMat);
   beam.position.y = 4;
   group.add(beam);
   
-  const iconMat = new THREE.MeshStandardMaterial({
-    color: destination.color, emissive: destination.color, emissiveIntensity: 0.8,
-  });
-  const icon = new THREE.Mesh(new THREE.SphereGeometry(0.6, 16, 16), iconMat);
+  var iconMat = new THREE.MeshBasicMaterial({ color: destination.color });
+  var icon = new THREE.Mesh(new THREE.SphereGeometry(0.6, 12, 12), iconMat);
   icon.position.y = 6;
   group.add(icon);
   
-  const pointLight = new THREE.PointLight(destination.color, 1.5, 15);
+  var pointLight = new THREE.PointLight(destination.color, 1.2, 12);
   pointLight.position.y = 3;
   group.add(pointLight);
   
   group.position.set(destination.x, 0, destination.z);
-  group.userData.destination = destination;
-  group.userData.startTime = performance.now();
-  group.userData.icon = icon;
-  group.userData.beam = beam;
-  group.userData.ring = ring;
+  group.userData = {
+    destination: destination,
+    startTime: performance.now(),
+    icon: icon,
+    beam: beam,
+    ring: ring,
+  };
   
   return group;
 }
@@ -1655,12 +1217,12 @@ function createDestinationMarker(destination) {
 function checkPassengerPickup() {
   if (player.hasPassenger) return;
   
-  for (let i = passengers.length - 1; i >= 0; i--) {
-    const p = passengers[i];
-    const dist = Math.hypot(p.x - tukTuk.position.x, p.z - tukTuk.position.z);
+  for (var i = passengers.length - 1; i >= 0; i--) {
+    var p = passengers[i];
+    var dist = Math.hypot(p.x - tukTuk.position.x, p.z - tukTuk.position.z);
     
-    if (dist < 2.6) {
-      const dest = p.destination;
+    if (dist < 3) {
+      var dest = p.destination;
       
       scene.remove(p.mesh);
       passengers.splice(i, 1);
@@ -1675,11 +1237,10 @@ function checkPassengerPickup() {
       AudioSystem.playPickup();
       UI.showToast('✅ راكب صعد! → ' + dest.name, 2000);
       
-      const riderMesh = createPassengerMesh();
-      riderMesh.scale.set(0.85, 0.85, 0.85);
-      riderMesh.position.set(0, 0.4, -0.75);
+      var riderMesh = createPassengerMesh();
+      riderMesh.scale.set(0.8, 0.8, 0.8);
+      riderMesh.position.set(0, 0.35, -0.7);
       riderMesh.userData.ring.visible = false;
-      riderMesh.userData.arrow.visible = false;
       tukTuk.add(riderMesh);
       tukTuk.userData.passengerRider = riderMesh;
       
@@ -1692,26 +1253,26 @@ function checkPassengerPickup() {
 function checkDelivery() {
   if (!player.hasPassenger || !activeDestination) return;
   
-  const dest = activeDestination.userData.destination;
-  const dist = Math.hypot(dest.x - tukTuk.position.x, dest.z - tukTuk.position.z);
+  var dest = activeDestination.userData.destination;
+  var dist = Math.hypot(dest.x - tukTuk.position.x, dest.z - tukTuk.position.z);
   
-  if (dist < 4) {
-    const tripTime = (performance.now() - player.tripStartTime) / 1000;
-    let reward = 60;
-    let rating = 3;
+  if (dist < 5) {
+    var tripTime = (performance.now() - player.tripStartTime) / 1000;
+    var reward = 60;
+    var rating = 3;
     
-    if (tripTime < 20) { reward = 100; rating = 5; }
-    else if (tripTime < 40) { reward = 80; rating = 4; }
-    else if (tripTime < 60) { reward = 60; rating = 3; }
-    else { reward = 40; rating = 2; }
+    if (tripTime < 30) { reward = 120; rating = 5; }
+    else if (tripTime < 60) { reward = 100; rating = 4; }
+    else if (tripTime < 90) { reward = 80; rating = 3; }
+    else { reward = 60; rating = 2; }
     
-    gameState.timeLeft = Math.min(gameState.timeLeft + 15, CONFIG.gameDuration);
+    gameState.timeLeft = Math.min(gameState.timeLeft + CONFIG.deliveryBonus, CONFIG.gameDuration);
     gameState.money += reward;
     gameState.deliveries++;
     gameState.ratingSum += rating;
     
     AudioSystem.playDelivery();
-    UI.showToast('🎉 تم التوصيل! +' + reward + ' جنيه +15 ثانية', 2200);
+    UI.showToast('🎉 توصيل! +' + reward + ' جنيه +30 ثانية', 2200);
     
     scene.remove(activeDestination);
     activeDestination = null;
@@ -1723,8 +1284,7 @@ function checkDelivery() {
     
     player.hasPassenger = false;
     player.currentPassenger = null;
-    
-    gameState.spawnTimer = 1.5;
+    gameState.spawnTimer = 1;
     
     updateHUD();
     updateMissionUI();
@@ -1736,13 +1296,13 @@ function updateHUD() {
   UI.deliveriesValue.textContent = gameState.deliveries;
   UI.timeValue.textContent = Utils.formatTime(gameState.timeLeft);
   
-  if (gameState.timeLeft < 20) {
+  if (gameState.timeLeft < 30) {
     UI.timeValue.classList.add('warning');
   } else {
     UI.timeValue.classList.remove('warning');
   }
   
-  const speedKmh = Math.abs(player.speed) * 3.6 * 3.5;
+  var speedKmh = Math.abs(player.speed) * 3.6 * 3.5;
   UI.speedValue.textContent = Math.round(speedKmh);
 }
 
@@ -1751,7 +1311,7 @@ function updateMissionUI() {
     UI.missionPanel.textContent = '🎯 اوصل الراكب إلى: ' + player.currentPassenger.name;
     UI.missionPanel.style.borderRightColor = '#00ff88';
   } else if (passengers.length > 0) {
-    UI.missionPanel.textContent = '👤 ' + passengers.length + ' راكب ينتظر — اقترب منهم لالتقاطهم';
+    UI.missionPanel.textContent = '👤 ' + passengers.length + ' راكب ينتظر — اقترب منهم';
     UI.missionPanel.style.borderRightColor = '#ffc800';
   } else {
     UI.missionPanel.textContent = '🔍 جاري البحث عن راكب...';
@@ -1760,34 +1320,26 @@ function updateMissionUI() {
 }
 
 function updatePassengers(dt) {
-  const now = performance.now();
+  var now = performance.now();
   
-  passengers.forEach(function(p) {
+  for (var i = 0; i < passengers.length; i++) {
+    var p = passengers[i];
     p.bobPhase += dt * 3;
-    const bob = Math.sin(p.bobPhase) * 0.05;
-    if (p.mesh) p.mesh.position.y = bob;
-    
-    if (p.mesh && p.mesh.userData.ring) {
-      p.mesh.userData.ring.rotation.z += dt * 0.5;
+    if (p.mesh) {
+      p.mesh.position.y = Math.sin(p.bobPhase) * 0.04;
+      if (p.mesh.userData.ring) {
+        p.mesh.userData.ring.rotation.z += dt * 0.5;
+      }
     }
-    if (p.mesh && p.mesh.userData.arrow) {
-      p.mesh.userData.arrow.position.y = 2.3 + Math.sin(now * 0.003 + p.bobPhase) * 0.15;
-      p.mesh.userData.arrow.rotation.y += dt * 2;
-    }
-  });
-  
-  if (activeDestination) {
-    const ud = activeDestination.userData;
-    const time = (now - ud.startTime) / 1000;
-    const pulse = 1 + Math.sin(time * 3) * 0.1;
-    ud.ring.scale.set(pulse, pulse, 1);
-    ud.beam.material.opacity = 0.15 + Math.sin(time * 2) * 0.08;
-    ud.icon.rotation.y += dt * 2;
-    ud.icon.position.y = 6 + Math.sin(time * 2) * 0.3;
   }
   
-  if (tukTuk.userData.passengerRider) {
-    tukTuk.userData.passengerRider.position.y = 0.4 + Math.sin(now * 0.005) * 0.02;
+  if (activeDestination) {
+    var ud = activeDestination.userData;
+    var time = (now - ud.startTime) / 1000;
+    var pulse = 1 + Math.sin(time * 3) * 0.1;
+    ud.ring.scale.set(pulse, pulse, 1);
+    ud.icon.rotation.y += dt * 2;
+    ud.icon.position.y = 6 + Math.sin(time * 2) * 0.3;
   }
 }
 
@@ -1797,12 +1349,10 @@ function updatePassengers(dt) {
 function animate() {
   requestAnimationFrame(animate);
   
-  const now = performance.now();
-  let dt = (now - gameState.lastTime) / 1000;
+  var now = performance.now();
+  var dt = (now - gameState.lastTime) / 1000;
   gameState.lastTime = now;
   dt = Math.min(dt, 0.05);
-  
-  animateCanal(now);
   
   if (!gameState.running || gameState.paused) {
     renderer.render(scene, camera);
@@ -1823,7 +1373,7 @@ function animate() {
     if (passengers.length < CONFIG.maxPassengers && !player.hasPassenger) {
       spawnPassenger();
     }
-    gameState.spawnTimer = 2 + Math.random() * 3;
+    gameState.spawnTimer = 2 + Math.random() * 2;
   }
   
   updateTukTukPhysics(dt);
@@ -1832,10 +1382,11 @@ function animate() {
   updateCamera(dt);
   updatePassengers(dt);
   
-  const isAccelerating = !!(keys['KeyW'] || keys['ArrowUp'] || mobileInput.accel);
-  AudioSystem.updateEngine(Math.abs(player.speed), player.maxSpeed, isAccelerating);
+  var isAccelerating = !!(keys['KeyW'] || keys['ArrowUp'] || mobileInput.accel);
+  AudioSystem.updateEngine(Math.abs(player.speed), CONFIG.maxSpeed, isAccelerating);
   
-  sunLight.position.set(tukTuk.position.x + 180, 280, tukTuk.position.z + 150);
+  // الشمس تتابع اللاعب
+  sunLight.position.set(tukTuk.position.x + 100, 200, tukTuk.position.z + 80);
   sunLight.target.position.copy(tukTuk.position);
   sunLight.target.updateMatrixWorld();
   
@@ -1846,16 +1397,15 @@ function animate() {
 /* ============================================================
    بدء اللعبة
    ============================================================ */
-let isInitialized = false;
+var isInitialized = false;
 
 async function startGame() {
-  console.log('🎬 محاولة بدء اللعبة...');
+  console.log('🎬 بدء اللعبة...');
   
   AudioSystem.init();
   AudioSystem.resume();
   
   if (isInitialized) {
-    console.log('✅ إعادة تشغيل اللعبة');
     resetGame();
     gameState.running = true;
     gameState.paused = false;
@@ -1864,16 +1414,12 @@ async function startGame() {
     UI.hud.style.display = 'flex';
     UI.missionPanel.style.display = 'block';
     UI.pauseBtn.style.display = 'flex';
-    UI.crosshair.style.display = 'block';
     
     if (isMobile) {
       UI.mobileControls.classList.add('visible');
-      UI.showHint('استخدم الأزرار للقيادة — اسحب للنظر', 6000);
+      UI.showHint('استخدم الأزرار للقيادة', 5000);
     } else {
-      UI.showHint('W/A/S/D للحركة — الماوس للنظر — Space فرملة', 6000);
-      if (renderer.domElement.requestPointerLock) {
-        renderer.domElement.requestPointerLock();
-      }
+      UI.showHint('W/A/S/D للحركة — Space فرملة', 5000);
     }
     
     if (player.engineOn) AudioSystem.setEngine(true);
@@ -1890,8 +1436,6 @@ async function startGame() {
     });
     
     setupMobileButtons();
-    setupPointerLock();
-    
     isInitialized = true;
     
     resetGame();
@@ -1903,13 +1447,12 @@ async function startGame() {
     UI.hud.style.display = 'flex';
     UI.missionPanel.style.display = 'block';
     UI.pauseBtn.style.display = 'flex';
-    UI.crosshair.style.display = 'block';
     
     if (isMobile) {
       UI.mobileControls.classList.add('visible');
-      UI.showHint('استخدم الأزرار للقيادة — اسحب للنظر', 6000);
+      UI.showHint('استخدم الأزرار للقيادة — العربية بتتحرك لوحدها مع الأزرار', 5000);
     } else {
-      UI.showHint('W/A/S/D للحركة — الماوس للنظر — Space فرملة', 6000);
+      UI.showHint('W/A/S/D للحركة — Space فرملة', 5000);
     }
     
     if (player.engineOn) AudioSystem.setEngine(true);
@@ -1928,13 +1471,49 @@ async function startGame() {
     console.log('✅ اللعبة بدأت!');
     
   } catch (error) {
-    console.error('❌ خطأ في تحميل اللعبة:', error);
-    UI.showToast('حدث خطأ أثناء التحميل، حاول مرة أخرى', 3000);
+    console.error('❌ خطأ:', error);
+    UI.showToast('حدث خطأ أثناء التحميل', 3000);
     UI.startBtn.disabled = false;
     UI.startBtn.textContent = '🚀 ابدأ الرحلة';
   }
 }
 
+/* ============================================================
+   بناء المدينة
+   ============================================================ */
+async function buildCity(onProgress) {
+  var steps = [
+    { name: 'إنشاء الأرضية...', fn: createGround, weight: 5 },
+    { name: 'بناء ترعة المحمودية...', fn: createCanal, weight: 15 },
+    { name: 'رصف الشوارع...', fn: createRoads, weight: 20 },
+    { name: 'مد السكة الحديد...', fn: createRailway, weight: 10 },
+    { name: 'زراعة النخيل والأشجار...', fn: createFoliage, weight: 15 },
+    { name: 'بناء المنازل والمحلات...', fn: createBuildings, weight: 25 },
+  ];
+  
+  var accumulated = 0;
+  var totalWeight = steps.reduce(function(sum, s) { return sum + s.weight; }, 0);
+  
+  for (var i = 0; i < steps.length; i++) {
+    var step = steps[i];
+    if (onProgress) onProgress(Math.round((accumulated / totalWeight) * 100), step.name);
+    
+    await new Promise(function(resolve) {
+      requestAnimationFrame(function() {
+        try { step.fn(); } catch (e) { console.error('خطأ في', step.name, e); }
+        resolve();
+      });
+    });
+    
+    accumulated += step.weight;
+  }
+  
+  if (onProgress) onProgress(100, 'جاهز للانطلاق! 🚀');
+}
+
+/* ============================================================
+   إعادة تعيين
+   ============================================================ */
 function resetGame() {
   gameState.money = 0;
   gameState.deliveries = 0;
@@ -1944,22 +1523,20 @@ function resetGame() {
   gameState.elapsedTime = 0;
   gameState.paused = false;
   
-  tukTuk.position.set(0, 0, 200);
+  tukTuk.position.set(0, 0, 150);
   tukTuk.rotation.set(0, 0, 0);
   
   player.speed = 0;
   player.steering = 0;
   player.currentWheelAngle = 0;
-  player.headYaw = 0;
-  player.headPitch = 0;
   player.hasPassenger = false;
   player.currentPassenger = null;
   player.engineOn = true;
   player.handbrake = false;
   
-  passengers.forEach(function(p) {
-    scene.remove(p.mesh);
-  });
+  for (var i = 0; i < passengers.length; i++) {
+    scene.remove(passengers[i].mesh);
+  }
   passengers.length = 0;
   
   if (activeDestination) {
@@ -1972,10 +1549,11 @@ function resetGame() {
     tukTuk.userData.passengerRider = null;
   }
   
-  const offset = CAMERA_OFFSET.clone();
-  offset.applyAxisAngle(new THREE.Vector3(0, 1, 0), tukTuk.rotation.y);
-  camera.position.copy(tukTuk.position).add(offset);
-  camera.lookAt(tukTuk.position.x, tukTuk.position.y + 1.5, tukTuk.position.z + 10);
+  // ضبط الكاميرا
+  var forward = new THREE.Vector3(0, 0, 1);
+  camera.position.copy(tukTuk.position).sub(forward.multiplyScalar(cameraOffset.distance));
+  camera.position.y = cameraOffset.height;
+  camera.lookAt(tukTuk.position.x, cameraOffset.lookAtHeight, tukTuk.position.z);
   
   updateHUD();
   updateMissionUI();
@@ -1989,14 +1567,10 @@ function togglePause() {
     UI.pauseBtn.textContent = '▶️';
     UI.showToast('⏸️ اللعبة متوقفة', 1500);
     AudioSystem.setEngine(false);
-    if (document.pointerLockElement) document.exitPointerLock();
   } else {
     UI.pauseBtn.textContent = '⏸️';
     UI.showToast('▶️ استمر!', 1000);
     if (player.engineOn) AudioSystem.setEngine(true);
-    if (!isMobile && renderer.domElement.requestPointerLock) {
-      renderer.domElement.requestPointerLock();
-    }
   }
 }
 
@@ -2004,9 +1578,7 @@ function endGame() {
   gameState.running = false;
   AudioSystem.setEngine(false);
   
-  if (document.pointerLockElement) document.exitPointerLock();
-  
-  const avgRating = gameState.deliveries > 0
+  var avgRating = gameState.deliveries > 0
     ? (gameState.ratingSum / gameState.deliveries).toFixed(1)
     : '0';
   
@@ -2019,18 +1591,12 @@ function endGame() {
   UI.mobileControls.classList.remove('visible');
   UI.pauseBtn.style.display = 'none';
   
-  console.log('🏁 انتهت اللعبة', {
-    money: gameState.money,
-    deliveries: gameState.deliveries,
-    rating: avgRating,
-  });
+  console.log('🏁 انتهت اللعبة');
 }
 
 /* ============================================================
-   ربط الأزرار - في النهاية بعد تعريف كل الدوال
+   ربط الأزرار
    ============================================================ */
-console.log('🔗 ربط أزرار اللعبة...');
-
 UI.startBtn.addEventListener('click', function(e) {
   e.preventDefault();
   startGame();
@@ -2046,9 +1612,7 @@ UI.restartBtn.addEventListener('click', function() {
   startGame();
 });
 
-UI.pauseBtn.addEventListener('click', function() {
-  togglePause();
-});
+UI.pauseBtn.addEventListener('click', togglePause);
 
 document.addEventListener('keydown', function(e) {
   if (e.code === 'Escape' || e.code === 'KeyP') {
@@ -2064,14 +1628,6 @@ window.addEventListener('resize', function() {
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
-window.addEventListener('orientationchange', function() {
-  setTimeout(function() {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
-  }, 200);
-});
-
-console.log('🎮 اللعبة جاهزة! اضغط "🚀 ابدأ الرحلة"');
+console.log('🎮 اللعبة جاهزة!');
 
 })();
