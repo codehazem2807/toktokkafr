@@ -2608,6 +2608,1364 @@ window._GAME.updatePeople = updatePeople;
 window._GAME.isOnRoad = isOnRoad;
 window._GAME.isNearLandmark = isNearLandmark;
 
-console.log('✅ الجزء 2 من game.js جاهز - التوك توك والناس والقهاوي');
+/* ============================================================
+   🛺 الجزء 3: القيادة + الركاب + الخريطة + الراديو + الحلقة الرئيسية
+   ============================================================ */
 
-})();
+/* ============================================================
+   🚦 إشارات المرور
+   ============================================================ */
+var trafficLights = [];
+
+function createTrafficLight(x, z, rotation) {
+  var g = new THREE.Group();
+  
+  var pole = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.12, 0.12, 6, 8),
+    MAT.trafficPole
+  );
+  pole.position.y = 3;
+  g.add(pole);
+  
+  var box = new THREE.Mesh(
+    new THREE.BoxGeometry(0.7, 2, 0.5),
+    MAT.trafficPole
+  );
+  box.position.y = 6.5;
+  g.add(box);
+  
+  var redLight = new THREE.Mesh(new THREE.CircleGeometry(0.22, 12), MAT.trafficRed);
+  redLight.position.set(0, 7.2, 0.26);
+  g.add(redLight);
+  
+  var yellowLight = new THREE.Mesh(new THREE.CircleGeometry(0.22, 12), MAT.trafficOff);
+  yellowLight.position.set(0, 6.5, 0.26);
+  g.add(yellowLight);
+  
+  var greenLight = new THREE.Mesh(new THREE.CircleGeometry(0.22, 12), MAT.trafficOff);
+  greenLight.position.set(0, 5.8, 0.26);
+  g.add(greenLight);
+  
+  g.position.set(x, 0, z);
+  g.rotation.y = rotation;
+  
+  g.userData = {
+    redLight: redLight,
+    yellowLight: yellowLight,
+    greenLight: greenLight,
+    state: 0,
+    timer: Math.random() * 10,
+  };
+  
+  return g;
+}
+
+function createTrafficLights() {
+  var group = new THREE.Group();
+  
+  var intersections = [
+    { x: 20, z: -15, r: 0 },
+    { x: -20, z: -15, r: Math.PI },
+    { x: 20, z: 30, r: 0 },
+    { x: 280, z: 120, r: 0 },
+    { x: -320, z: 0, r: Math.PI / 2 },
+    { x: 100, z: 330, r: 0 },
+  ];
+  
+  for (var i = 0; i < intersections.length; i++) {
+    var tl = createTrafficLight(intersections[i].x, intersections[i].z, intersections[i].r);
+    group.add(tl);
+    trafficLights.push(tl);
+  }
+  
+  scene.add(group);
+}
+
+function updateTrafficLights(dt) {
+  for (var i = 0; i < trafficLights.length; i++) {
+    var tl = trafficLights[i];
+    var ud = tl.userData;
+    
+    ud.timer -= dt;
+    if (ud.timer <= 0) {
+      ud.state = (ud.state + 1) % 3;
+      if (ud.state === 0) ud.timer = 6;
+      else if (ud.state === 1) ud.timer = 2;
+      else ud.timer = 6;
+      
+      ud.redLight.material = ud.state === 0 ? MAT.trafficRed : MAT.trafficOff;
+      ud.yellowLight.material = ud.state === 1 ? MAT.trafficYellow : MAT.trafficOff;
+      ud.greenLight.material = ud.state === 2 ? MAT.trafficGreen : MAT.trafficOff;
+    }
+  }
+}
+
+/* ============================================================
+   👮 اللجان الأمنية
+   ============================================================ */
+var policeCheckpoints = [];
+
+function createPoliceCheckpoint(x, z, rotation) {
+  var g = new THREE.Group();
+  
+  // الكونات
+  for (var i = 0; i < 5; i++) {
+    var cone = new THREE.Mesh(
+      new THREE.ConeGeometry(0.25, 0.7, 8),
+      new THREE.MeshLambertMaterial({ color: 0xff6600 })
+    );
+    cone.position.set(Utils.rand(-2, 2), 0.35, Utils.rand(-0.5, 0.5));
+    g.add(cone);
+  }
+  
+  // الحاجز
+  var barrier = new THREE.Mesh(
+    new THREE.BoxGeometry(4, 0.15, 0.15),
+    new THREE.MeshLambertMaterial({ color: 0xffffff })
+  );
+  barrier.position.y = 1;
+  g.add(barrier);
+  
+  for (var i = -1; i <= 1; i += 2) {
+    var post = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.08, 0.08, 2),
+      MAT.trafficPole
+    );
+    post.position.set(i * 2, 1, 0);
+    g.add(post);
+  }
+  
+  // الظابط
+  var officer = new THREE.Group();
+  
+  var torso = new THREE.Mesh(
+    new THREE.BoxGeometry(0.5, 0.7, 0.3),
+    MAT.policeShirt
+  );
+  torso.position.y = 1.15;
+  officer.add(torso);
+  
+  var head = new THREE.Mesh(
+    new THREE.SphereGeometry(0.16, 8, 8),
+    Utils.pick(MAT.peopleSkin)
+  );
+  head.position.y = 1.65;
+  officer.add(head);
+  
+  var cap = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.18, 0.18, 0.12, 8),
+    MAT.policeCap
+  );
+  cap.position.y = 1.78;
+  officer.add(cap);
+  
+  var badge = new THREE.Mesh(
+    new THREE.BoxGeometry(0.08, 0.08, 0.02),
+    MAT.policeBadge
+  );
+  badge.position.set(0.15, 1.35, 0.16);
+  officer.add(badge);
+  
+  var pants = new THREE.Mesh(
+    new THREE.BoxGeometry(0.5, 0.8, 0.3),
+    MAT.policePants
+  );
+  pants.position.y = 0.4;
+  officer.add(pants);
+  
+  var armGeo = new THREE.BoxGeometry(0.14, 0.6, 0.14);
+  var armL = new THREE.Mesh(armGeo, MAT.policeShirt);
+  armL.position.set(-0.32, 1.15, 0);
+  officer.add(armL);
+  
+  var armR = new THREE.Mesh(armGeo, MAT.policeShirt);
+  armR.position.set(0.32, 1.15, 0);
+  officer.add(armR);
+  
+  officer.position.set(1.5, 0, 0);
+  g.add(officer);
+  
+  g.position.set(x, 0, z);
+  g.rotation.y = rotation;
+  g.userData = { officer: officer, armR: armR };
+  
+  return g;
+}
+
+function createPoliceCheckpoints() {
+  var group = new THREE.Group();
+  
+  var checkpoints = [
+    { x: -100, z: -15, r: 0 },
+    { x: 150, z: -15, r: 0 },
+    { x: 0, z: 100, r: Math.PI / 2 },
+    { x: -300, z: 100, r: 0 },
+  ];
+  
+  for (var i = 0; i < checkpoints.length; i++) {
+    var cp = createPoliceCheckpoint(checkpoints[i].x, checkpoints[i].z, checkpoints[i].r);
+    group.add(cp);
+    policeCheckpoints.push(cp);
+  }
+  
+  scene.add(group);
+}
+
+function updatePoliceCheckpoints(dt) {
+  for (var i = 0; i < policeCheckpoints.length; i++) {
+    var cp = policeCheckpoints[i];
+    var ud = cp.userData;
+    if (ud.armR) {
+      ud.armR.rotation.x = Math.sin(performance.now() * 0.002) * 0.5;
+    }
+  }
+}
+
+/* ============================================================
+   🎮 حالة اللاعب
+   ============================================================ */
+var player = {
+  speed: 0,
+  steering: 0,
+  currentWheelAngle: 0,
+  engineOn: true,
+  handbrake: false,
+  hasPassenger: false,
+  currentPassenger: null,
+  tripStartTime: 0,
+};
+
+/* ============================================================
+   📷 كاميرا الشخص الثالث
+   ============================================================ */
+var CAMERA_DISTANCE = 7.5;
+var CAMERA_HEIGHT = 3.8;
+var CAMERA_LOOK_HEIGHT = 1.3;
+
+function updateCamera(dt) {
+  // موقع الكاميرا المثالي (خلف التوك توك)
+  var forwardX = Math.sin(tukTuk.rotation.y);
+  var forwardZ = Math.cos(tukTuk.rotation.y);
+  
+  var targetX = tukTuk.position.x - forwardX * CAMERA_DISTANCE;
+  var targetY = CAMERA_HEIGHT;
+  var targetZ = tukTuk.position.z - forwardZ * CAMERA_DISTANCE;
+  
+  var smoothFactor = 1 - Math.pow(0.0001, dt);
+  camera.position.x += (targetX - camera.position.x) * smoothFactor;
+  camera.position.y += (targetY - camera.position.y) * smoothFactor;
+  camera.position.z += (targetZ - camera.position.z) * smoothFactor;
+  
+  // الكاميرا تبص على التوك توك
+  camera.lookAt(
+    tukTuk.position.x,
+    tukTuk.position.y + CAMERA_LOOK_HEIGHT,
+    tukTuk.position.z
+  );
+}
+
+/* ============================================================
+   ⌨️ المدخلات - كيبورد
+   ============================================================ */
+var keys = {};
+
+document.addEventListener('keydown', function(e) {
+  keys[e.code] = true;
+  if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].indexOf(e.code) !== -1) {
+    e.preventDefault();
+  }
+  if (e.code === 'Space') player.handbrake = true;
+  if (e.code === 'KeyE') {
+    player.engineOn = !player.engineOn;
+    AudioSystem.setEngine(player.engineOn);
+    UI.showToast(player.engineOn ? '🔊 المحرك شغّال' : '🔇 المحرك مطفأ', 1000);
+  }
+  if (e.code === 'KeyH') {
+    AudioSystem.playHorn();
+    UI.showToast('📢 كلاكس', 800);
+  }
+  if (e.code === 'KeyR') {
+    radio.toggle();
+    UI.showToast(radio.isPlaying ? '📻 الراديو شغال' : '📻 الراديو وقف', 1200);
+  }
+});
+
+document.addEventListener('keyup', function(e) {
+  keys[e.code] = false;
+  if (e.code === 'Space') player.handbrake = false;
+});
+
+/* ============================================================
+   📱 أزرار الموبايل
+   ============================================================ */
+var mobileInput = {
+  accel: false,
+  brake: false,
+  left: false,
+  right: false,
+};
+
+function setupMobileButtons() {
+  var buttons = {
+    btnAccel: 'accel',
+    btnBrake: 'brake',
+    btnLeft: 'left',
+    btnRight: 'right',
+  };
+  
+  Object.keys(buttons).forEach(function(id) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    var key = buttons[id];
+    
+    var press = function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      mobileInput[key] = true;
+      el.classList.add('pressed');
+    };
+    var release = function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      mobileInput[key] = false;
+      el.classList.remove('pressed');
+    };
+    
+    el.addEventListener('touchstart', press, { passive: false });
+    el.addEventListener('touchend', release, { passive: false });
+    el.addEventListener('touchcancel', release, { passive: false });
+    el.addEventListener('mousedown', press);
+    el.addEventListener('mouseup', release);
+    el.addEventListener('mouseleave', release);
+  });
+  
+  // زر فرملة اليد
+  var hbBtn = document.getElementById('btnHandbrake');
+  if (hbBtn) {
+    var hbPress = function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      player.handbrake = true;
+      hbBtn.classList.add('pressed');
+    };
+    var hbRelease = function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      player.handbrake = false;
+      hbBtn.classList.remove('pressed');
+    };
+    hbBtn.addEventListener('touchstart', hbPress, { passive: false });
+    hbBtn.addEventListener('touchend', hbRelease, { passive: false });
+    hbBtn.addEventListener('mousedown', hbPress);
+    hbBtn.addEventListener('mouseup', hbRelease);
+  }
+  
+  // زر الكلاكس
+  var hornBtn = document.getElementById('btnHorn');
+  if (hornBtn) {
+    var hornPress = function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      AudioSystem.playHorn();
+      hornBtn.classList.add('pressed');
+      UI.showToast('📢 كلاكس', 800);
+    };
+    var hornRelease = function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      hornBtn.classList.remove('pressed');
+    };
+    hornBtn.addEventListener('touchstart', hornPress, { passive: false });
+    hornBtn.addEventListener('touchend', hornRelease, { passive: false });
+    hornBtn.addEventListener('mousedown', hornPress);
+    hornBtn.addEventListener('mouseup', hornRelease);
+  }
+}
+
+/* ============================================================
+   🚗 فيزياء التوك توك
+   ============================================================ */
+function updateTukTukPhysics(dt) {
+  if (!gameState.running || gameState.paused) return;
+  
+  var throttle = (keys['KeyW'] || keys['ArrowUp'] || mobileInput.accel) ? 1 : 0;
+  var brake = (keys['KeyS'] || keys['ArrowDown'] || mobileInput.brake) ? 1 : 0;
+  
+  // ===== تسريع/تباطؤ =====
+  if (!player.engineOn) {
+    player.speed *= (1 - 3 * dt);
+    if (Math.abs(player.speed) < 0.1) player.speed = 0;
+  } else if (player.handbrake) {
+    player.speed *= (1 - 10 * dt);
+    if (Math.abs(player.speed) < 0.1) player.speed = 0;
+  } else {
+    if (throttle && !brake) {
+      player.speed += CONFIG.acceleration * dt;
+    } else if (brake && !throttle) {
+      if (player.speed > 0.5) {
+        player.speed -= CONFIG.braking * dt;
+      } else {
+        player.speed -= CONFIG.acceleration * 0.5 * dt;
+      }
+    } else {
+      if (player.speed > 0) {
+        player.speed -= CONFIG.friction * dt * 3;
+        if (player.speed < 0.05) player.speed = 0;
+      } else if (player.speed < 0) {
+        player.speed += CONFIG.friction * dt * 3;
+        if (player.speed > -0.05) player.speed = 0;
+      }
+    }
+    player.speed = Utils.clamp(player.speed, -CONFIG.maxReverseSpeed, CONFIG.maxSpeed);
+  }
+  
+  // ===== المقود =====
+  var leftInput = (keys['KeyA'] || keys['ArrowLeft'] || mobileInput.left) ? 1 : 0;
+  var rightInput = (keys['KeyD'] || keys['ArrowRight'] || mobileInput.right) ? 1 : 0;
+  var steerInput = rightInput - leftInput;
+  
+  var steerDiff = steerInput - player.steering;
+  var steerStep = Math.sign(steerDiff) * Math.min(Math.abs(steerDiff), CONFIG.steeringSpeed * dt);
+  player.steering += steerStep;
+  player.steering = Utils.clamp(player.steering, -1, 1);
+  if (steerInput === 0) player.steering *= (1 - 2 * dt);
+  
+  var speedRatio = Math.min(Math.abs(player.speed) / CONFIG.maxSpeed, 1);
+  var maxAngle = CONFIG.maxWheelAngle * (1 - speedRatio * 0.55);
+  player.currentWheelAngle = player.steering * maxAngle;
+  
+  // ===== دوران التوك توك =====
+  if (Math.abs(player.speed) > 0.1) {
+    var speedFactor = Math.min(Math.abs(player.speed) / 7, 1.2);
+    var direction = player.speed >= 0 ? 1 : -1;
+    var turnRate = player.currentWheelAngle * speedFactor * dt * 3 * direction;
+    tukTuk.rotation.y -= turnRate;
+  }
+  
+  // ===== الحركة =====
+  var forward = new THREE.Vector3(
+    Math.sin(tukTuk.rotation.y), 0, Math.cos(tukTuk.rotation.y)
+  );
+  var velocity = forward.multiplyScalar(player.speed * dt);
+  var newPos = tukTuk.position.clone().add(velocity);
+  
+  // تصادم مع الترعة
+  var inCanalX = !(newPos.x > -14 && newPos.x < 14);
+  var nearCanal = Math.abs(newPos.z) < CONFIG.canalWidth / 2 + 1.5;
+  
+  if (nearCanal && inCanalX) {
+    player.speed *= -0.25;
+  } else if (Math.abs(newPos.x) < CONFIG.citySize / 2 - 3 && Math.abs(newPos.z) < CONFIG.citySize / 2 - 3) {
+    tukTuk.position.copy(newPos);
+  } else {
+    player.speed *= -0.3;
+  }
+  
+  // ===== العجلات =====
+  var wheelRoll = (player.speed * dt) / 0.26;
+  for (var i = 0; i < tukTuk.userData.wheels.length; i++) {
+    var w = tukTuk.userData.wheels[i];
+    var tire = w.children[0];
+    if (tire) tire.rotation.x += wheelRoll;
+    if (w.children[1]) w.children[1].rotation.x += wheelRoll;
+    if (w.userData.isFront) w.rotation.y = player.currentWheelAngle;
+  }
+  
+  // ===== المقود =====
+  tukTuk.userData.steeringWheel.rotation.z = -player.steering * Math.PI * 0.85;
+  
+  // ===== اهتزاز خفيف =====
+  tukTuk.position.y = Math.max(0, Math.sin(performance.now() * 0.02) * 0.005 * (1 + speedRatio));
+}
+
+/* ============================================================
+   🎯 حالة اللعبة
+   ============================================================ */
+var gameState = {
+  running: false,
+  paused: false,
+  money: 0,
+  deliveries: 0,
+  ratingSum: 0,
+  timeLeft: CONFIG.gameDuration,
+  lastTime: 0,
+  spawnTimer: 0,
+  elapsedTime: 0,
+  dialogTimer: 5,
+  trafficWarnTimer: 5,
+};
+
+/* ============================================================
+   👥 نظام الركاب
+   ============================================================ */
+var passengers = [];
+var activeDestination = null;
+
+function getPassengerSpawnPoint() {
+  var candidates = [];
+  
+  for (var i = 0; i < ROADS_DATA.length; i++) {
+    var rd = ROADS_DATA[i];
+    if (rd.width < 14) continue;
+    
+    var steps = Math.floor(rd.length / 100);
+    for (var j = 0; j < steps; j++) {
+      var off = -rd.length / 2 + j * 100 + 50;
+      var side = Math.random() > 0.5 ? 1 : -1;
+      var so = side * (rd.width / 2 + CONFIG.sidewalkWidth / 2);
+      var x = rd.x + Math.sin(rd.rotation) * off + Math.cos(rd.rotation) * so;
+      var z = rd.z + Math.cos(rd.rotation) * off - Math.sin(rd.rotation) * so;
+      
+      if (Math.abs(z) < CONFIG.canalWidth / 2 + 4) continue;
+      if (Math.abs(x + 260) < 8) continue;
+      
+      var dist = Math.hypot(x - tukTuk.position.x, z - tukTuk.position.z);
+      if (dist < 60 || dist > 350) continue;
+      
+      candidates.push({ x: x, z: z });
+    }
+  }
+  
+  if (candidates.length === 0) return null;
+  return Utils.pick(candidates);
+}
+
+function createPassengerMesh() {
+  var group = new THREE.Group();
+  
+  var shirtMat = Utils.pick(MAT.peopleShirt);
+  var pantsMat = Utils.pick(MAT.peoplePants);
+  var skinMat = Utils.pick(MAT.peopleSkin);
+  var hairMat = Utils.pick(MAT.peopleHair);
+  
+  // الجسم
+  var torso = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.65, 0.28), shirtMat);
+  torso.position.y = 1.1;
+  group.add(torso);
+  
+  // الرأس
+  var head = new THREE.Mesh(new THREE.SphereGeometry(0.16, 8, 8), skinMat);
+  head.position.y = 1.6;
+  group.add(head);
+  
+  // الشعر
+  var hair = new THREE.Mesh(
+    new THREE.SphereGeometry(0.17, 8, 8, 0, Math.PI * 2, 0, Math.PI / 2),
+    hairMat
+  );
+  hair.position.y = 1.62;
+  group.add(hair);
+  
+  // الأرجل
+  var legs = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.75, 0.28), pantsMat);
+  legs.position.y = 0.4;
+  group.add(legs);
+  
+  // الذراعين
+  var armGeo = new THREE.BoxGeometry(0.12, 0.55, 0.12);
+  var armL = new THREE.Mesh(armGeo, shirtMat);
+  armL.position.set(-0.3, 1.1, 0);
+  group.add(armL);
+  
+  var armR = new THREE.Mesh(armGeo, shirtMat);
+  armR.position.set(0.3, 1.1, 0);
+  group.add(armR);
+  
+  // هالة
+  var ringMat = new THREE.MeshBasicMaterial({
+    color: 0x00ff88, transparent: true, opacity: 0.7, side: THREE.DoubleSide,
+  });
+  var ring = new THREE.Mesh(new THREE.RingGeometry(0.5, 0.75, 16), ringMat);
+  ring.rotation.x = -Math.PI / 2;
+  ring.position.y = 0.05;
+  group.add(ring);
+  group.userData.ring = ring;
+  
+  // سهم فوق الرأس
+  var arrowMat = new THREE.MeshBasicMaterial({ color: 0x00ff88 });
+  var arrow = new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.4, 4), arrowMat);
+  arrow.position.y = 2.3;
+  arrow.rotation.x = Math.PI;
+  group.add(arrow);
+  group.userData.arrow = arrow;
+  
+  return group;
+}
+
+function spawnPassenger() {
+  if (passengers.length >= CONFIG.maxPassengers) return;
+  if (player.hasPassenger) return;
+  
+  var spawnPoint = getPassengerSpawnPoint();
+  if (!spawnPoint) return;
+  
+  var destination;
+  var attempts = 0;
+  do {
+    destination = Utils.pick(DESTINATIONS_DATA);
+    attempts++;
+  } while (attempts < 10 && passengers.some(function(p) { 
+    return p.destination.name === destination.name; 
+  }));
+  
+  var mesh = createPassengerMesh();
+  mesh.position.set(spawnPoint.x, 0, spawnPoint.z);
+  mesh.rotation.y = Math.random() * Math.PI * 2;
+  scene.add(mesh);
+  
+  passengers.push({
+    mesh: mesh,
+    x: spawnPoint.x,
+    z: spawnPoint.z,
+    destination: destination,
+    bobPhase: Math.random() * Math.PI * 2,
+  });
+  
+  updateMissionUI();
+}
+
+function createDestinationMarker(destination) {
+  var group = new THREE.Group();
+  
+  var ringMat = new THREE.MeshBasicMaterial({
+    color: destination.color, transparent: true, opacity: 0.7, side: THREE.DoubleSide,
+  });
+  var ring = new THREE.Mesh(new THREE.RingGeometry(2, 3, 24), ringMat);
+  ring.rotation.x = -Math.PI / 2;
+  ring.position.y = 0.1;
+  group.add(ring);
+  
+  var innerMat = new THREE.MeshBasicMaterial({
+    color: destination.color, transparent: true, opacity: 0.3, side: THREE.DoubleSide,
+  });
+  var inner = new THREE.Mesh(new THREE.CircleGeometry(1.5, 20), innerMat);
+  inner.rotation.x = -Math.PI / 2;
+  inner.position.y = 0.15;
+  group.add(inner);
+  
+  var beamMat = new THREE.MeshBasicMaterial({
+    color: destination.color, transparent: true, opacity: 0.25, side: THREE.DoubleSide,
+  });
+  var beam = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 1.5, 8, 12, 1, true), beamMat);
+  beam.position.y = 4;
+  group.add(beam);
+  
+  var iconMat = new THREE.MeshBasicMaterial({ color: destination.color });
+  var icon = new THREE.Mesh(new THREE.SphereGeometry(0.6, 12, 12), iconMat);
+  icon.position.y = 6;
+  group.add(icon);
+  
+  var pointLight = new THREE.PointLight(destination.color, 1.2, 15);
+  pointLight.position.y = 3;
+  group.add(pointLight);
+  
+  group.position.set(destination.x, 0, destination.z);
+  group.userData = {
+    destination: destination,
+    startTime: performance.now(),
+    icon: icon,
+    beam: beam,
+    ring: ring,
+  };
+  
+  return group;
+}
+
+function checkPassengerPickup() {
+  if (player.hasPassenger) return;
+  
+  for (var i = passengers.length - 1; i >= 0; i--) {
+    var p = passengers[i];
+    var dist = Math.hypot(p.x - tukTuk.position.x, p.z - tukTuk.position.z);
+    
+    if (dist < 3) {
+      var dest = p.destination;
+      
+      scene.remove(p.mesh);
+      passengers.splice(i, 1);
+      
+      player.hasPassenger = true;
+      player.currentPassenger = dest;
+      player.tripStartTime = performance.now();
+      
+      activeDestination = createDestinationMarker(dest);
+      scene.add(activeDestination);
+      
+      AudioSystem.playPickup();
+      UI.showDialog(Utils.pick(DIALOGS.pickup), 3000);
+      UI.showToast('✅ راكب صعد! → ' + dest.name, 2500);
+      
+      // إضافة الراكب جوه التوك توك
+      var riderMesh = createPassengerMesh();
+      riderMesh.scale.set(0.75, 0.75, 0.75);
+      riderMesh.position.set(0, 0.35, -0.7);
+      riderMesh.userData.ring.visible = false;
+      riderMesh.userData.arrow.visible = false;
+      tukTuk.add(riderMesh);
+      tukTuk.userData.passengerRider = riderMesh;
+      
+      updateMissionUI();
+      break;
+    }
+  }
+}
+
+function checkDelivery() {
+  if (!player.hasPassenger || !activeDestination) return;
+  
+  var dest = activeDestination.userData.destination;
+  var dist = Math.hypot(dest.x - tukTuk.position.x, dest.z - tukTuk.position.z);
+  
+  if (dist < 5) {
+    var tripTime = (performance.now() - player.tripStartTime) / 1000;
+    var reward = 60;
+    var rating = 3;
+    
+    if (tripTime < 30) { reward = 120; rating = 5; }
+    else if (tripTime < 60) { reward = 100; rating = 4; }
+    else if (tripTime < 90) { reward = 80; rating = 3; }
+    else { reward = 60; rating = 2; }
+    
+    gameState.timeLeft = Math.min(gameState.timeLeft + CONFIG.deliveryBonus, CONFIG.gameDuration);
+    gameState.money += reward;
+    gameState.deliveries++;
+    gameState.ratingSum += rating;
+    
+    AudioSystem.playDelivery();
+    UI.showDialog(Utils.pick(DIALOGS.arrived), 2500);
+    UI.showToast('🎉 توصيل! +' + reward + ' جنيه +30 ثانية', 2500);
+    
+    scene.remove(activeDestination);
+    activeDestination = null;
+    
+    if (tukTuk.userData.passengerRider) {
+      tukTuk.remove(tukTuk.userData.passengerRider);
+      tukTuk.userData.passengerRider = null;
+    }
+    
+    player.hasPassenger = false;
+    player.currentPassenger = null;
+    gameState.spawnTimer = 1;
+    
+    updateHUD();
+    updateMissionUI();
+  }
+}
+
+/* ============================================================
+   📊 واجهة المستخدم
+   ============================================================ */
+function updateHUD() {
+  if (UI.moneyValue) UI.moneyValue.textContent = gameState.money;
+  if (UI.deliveriesValue) UI.deliveriesValue.textContent = gameState.deliveries;
+  if (UI.timeValue) {
+    UI.timeValue.textContent = Utils.formatTime(gameState.timeLeft);
+    if (gameState.timeLeft < 30) {
+      UI.timeValue.classList.add('warning');
+    } else {
+      UI.timeValue.classList.remove('warning');
+    }
+  }
+  
+  var speedKmh = Math.abs(player.speed) * 3.6 * 3.5;
+  if (UI.speedValue) UI.speedValue.textContent = Math.round(speedKmh);
+}
+
+function updateMissionUI() {
+  if (!UI.missionPanel) return;
+  
+  if (player.hasPassenger && player.currentPassenger) {
+    UI.missionPanel.textContent = '🎯 اوصل الراكب إلى: ' + player.currentPassenger.name;
+    UI.missionPanel.style.borderRightColor = '#00ff88';
+  } else if (passengers.length > 0) {
+    UI.missionPanel.textContent = '👤 ' + passengers.length + ' راكب ينتظر — اقترب منهم';
+    UI.missionPanel.style.borderRightColor = '#ffc800';
+  } else {
+    UI.missionPanel.textContent = '🔍 جاري البحث عن راكب...';
+    UI.missionPanel.style.borderRightColor = '#ffc800';
+  }
+}
+
+function updatePassengers(dt) {
+  var now = performance.now();
+  
+  for (var i = 0; i < passengers.length; i++) {
+    var p = passengers[i];
+    p.bobPhase += dt * 3;
+    if (p.mesh) {
+      p.mesh.position.y = Math.sin(p.bobPhase) * 0.04;
+      if (p.mesh.userData.ring) {
+        p.mesh.userData.ring.rotation.z += dt * 0.5;
+      }
+      if (p.mesh.userData.arrow) {
+        p.mesh.userData.arrow.position.y = 2.3 + Math.sin(now * 0.003) * 0.15;
+        p.mesh.userData.arrow.rotation.y += dt * 2;
+      }
+    }
+  }
+  
+  if (activeDestination) {
+    var ud = activeDestination.userData;
+    var time = (now - ud.startTime) / 1000;
+    var pulse = 1 + Math.sin(time * 3) * 0.1;
+    ud.ring.scale.set(pulse, pulse, 1);
+    ud.icon.rotation.y += dt * 2;
+    ud.icon.position.y = 6 + Math.sin(time * 2) * 0.3;
+  }
+  
+  // كلام السواق
+  if (player.hasPassenger) {
+    gameState.dialogTimer -= dt;
+    if (gameState.dialogTimer <= 0) {
+      UI.showDialog(Utils.pick(DIALOGS.driving), 2500);
+      gameState.dialogTimer = Utils.rand(8, 15);
+    }
+  }
+  
+  // تحذير من اللجان
+  gameState.trafficWarnTimer -= dt;
+  if (gameState.trafficWarnTimer <= 0) {
+    for (var i = 0; i < policeCheckpoints.length; i++) {
+      var cp = policeCheckpoints[i];
+      var dist = Math.hypot(cp.position.x - tukTuk.position.x, cp.position.z - tukTuk.position.z);
+      if (dist < 30 && dist > 15) {
+        UI.showDialog(Utils.pick(DIALOGS.police), 2500);
+        gameState.trafficWarnTimer = 15;
+        break;
+      }
+    }
+    for (var i = 0; i < trafficLights.length; i++) {
+      var tl = trafficLights[i];
+      var dist = Math.hypot(tl.position.x - tukTuk.position.x, tl.position.z - tukTuk.position.z);
+      if (dist < 25 && dist > 10 && tl.userData.state === 0) {
+        UI.showDialog('⚠️ الإشارة حمرا يا معلم', 2000);
+        gameState.trafficWarnTimer = 12;
+        break;
+      }
+    }
+    if (gameState.trafficWarnTimer <= 0) gameState.trafficWarnTimer = 8;
+  }
+}
+
+/* ============================================================
+   🗺️ الخريطة التفاعلية (Minimap)
+   ============================================================ */
+var minimapCtx = null;
+var minimapSize = 160;
+var minimapScale = 0.12;
+var minimapCenterX = 0;
+var minimapCenterZ = 0;
+
+function initMinimap() {
+  if (!UI.minimapCanvas) return;
+  minimapCtx = UI.minimapCanvas.getContext('2d');
+  minimapCtx.imageSmoothingEnabled = true;
+}
+
+function drawMinimap() {
+  if (!minimapCtx) return;
+  
+  var ctx = minimapCtx;
+  var w = UI.minimapCanvas.width;
+  var h = UI.minimapCanvas.height;
+  var scale = 0.12;
+  var cx = w / 2;
+  var cy = h / 2;
+  
+  // خلفية
+  ctx.fillStyle = '#0a1828';
+  ctx.fillRect(0, 0, w, h);
+  
+  // تحويل إحداثيات اللعبة للخريطة
+  function toMap(x, z) {
+    var mx = cx + (x - tukTuk.position.x) * scale;
+    var my = cy + (z - tukTuk.position.z) * scale;
+    return { x: mx, y: my };
+  }
+  
+  // رسم الشوارع
+  for (var i = 0; i < ROADS_DATA.length; i++) {
+    var rd = ROADS_DATA[i];
+    var color = rd.isMain ? '#4a7aaa' : '#2a4a6a';
+    ctx.fillStyle = color;
+    
+    var p1 = toMap(rd.x - Math.sin(rd.rotation) * rd.length / 2 - Math.cos(rd.rotation) * rd.width / 2,
+                   rd.z - Math.cos(rd.rotation) * rd.length / 2 + Math.sin(rd.rotation) * rd.width / 2);
+    var p2 = toMap(rd.x + Math.sin(rd.rotation) * rd.length / 2 + Math.cos(rd.rotation) * rd.width / 2,
+                   rd.z + Math.cos(rd.rotation) * rd.length / 2 - Math.sin(rd.rotation) * rd.width / 2);
+    
+    ctx.save();
+    ctx.translate(p1.x, p1.y);
+    ctx.rotate(-rd.rotation);
+    var roadW = Math.max(2, rd.width * scale);
+    var roadL = Math.max(2, rd.length * scale);
+    ctx.fillRect(-roadW / 2, -roadL / 2, roadW, roadL);
+    ctx.restore();
+  }
+  
+  // رسم الترعة
+  ctx.fillStyle = '#1a6a9a';
+  var canalTopLeft = toMap(-CONFIG.citySize * 0.6, -CONFIG.canalWidth / 2);
+  var canalBottomRight = toMap(CONFIG.citySize * 0.6, CONFIG.canalWidth / 2);
+  ctx.fillRect(
+    canalTopLeft.x,
+    canalTopLeft.y,
+    canalBottomRight.x - canalTopLeft.x,
+    canalBottomRight.y - canalTopLeft.y
+  );
+  
+  // رسم الوجهات
+  for (var i = 0; i < DESTINATIONS_DATA.length; i++) {
+    var dest = DESTINATIONS_DATA[i];
+    var p = toMap(dest.x, dest.z);
+    
+    if (p.x < -20 || p.x > w + 20 || p.y < -20 || p.y > h + 20) continue;
+    
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
+    ctx.fillStyle = '#' + dest.color.toString(16).padStart(6, '0');
+    ctx.fill();
+    
+    // علامة النشط
+    if (activeDestination && activeDestination.userData.destination.name === dest.name) {
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 7 + Math.sin(performance.now() * 0.005) * 2, 0, Math.PI * 2);
+      ctx.strokeStyle = '#00ff88';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+  }
+  
+  // رسم الركاب
+  for (var i = 0; i < passengers.length; i++) {
+    var p = toMap(passengers[i].x, passengers[i].z);
+    if (p.x < -10 || p.x > w + 10 || p.y < -10 || p.y > h + 10) continue;
+    
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
+    ctx.fillStyle = '#00ff88';
+    ctx.fill();
+  }
+  
+  // رسم السيارات
+  for (var i = 0; i < cars.length; i++) {
+    var p = toMap(cars[i].position.x, cars[i].position.z);
+    if (p.x < -10 || p.x > w + 10 || p.y < -10 || p.y > h + 10) continue;
+    
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 2, 0, Math.PI * 2);
+    ctx.fillStyle = '#ffcc00';
+    ctx.fill();
+  }
+  
+  // رسم التوك توك (اللاعب)
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(-tukTuk.rotation.y);
+  
+  // سهم أخضر
+  ctx.beginPath();
+  ctx.moveTo(0, -8);
+  ctx.lineTo(-5, 5);
+  ctx.lineTo(0, 3);
+  ctx.lineTo(5, 5);
+  ctx.closePath();
+  ctx.fillStyle = '#ffffff';
+  ctx.fill();
+  ctx.strokeStyle = '#000';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  
+  ctx.restore();
+  
+  // إطار
+  ctx.strokeStyle = '#ffc800';
+  ctx.lineWidth = 3;
+  ctx.strokeRect(1.5, 1.5, w - 3, h - 3);
+}
+
+/* ============================================================
+   📻 ربط أزرار الراديو
+   ============================================================ */
+function setupRadio() {
+  if (UI.radioToggle) {
+    UI.radioToggle.addEventListener('click', function() {
+      radio.toggle();
+    });
+  }
+  if (UI.radioPrev) {
+    UI.radioPrev.addEventListener('click', function() {
+      radio.prev();
+    });
+  }
+  if (UI.radioNext) {
+    UI.radioNext.addEventListener('click', function() {
+      radio.next();
+    });
+  }
+  if (UI.radioBtn) {
+    UI.radioBtn.addEventListener('click', function() {
+      UI.radioPanel.classList.toggle('visible');
+      UI.radioBtn.classList.toggle('active');
+    });
+  }
+}
+
+/* ============================================================
+   🔄 الحلقة الرئيسية
+   ============================================================ */
+function animate() {
+  requestAnimationFrame(animate);
+  
+  var now = performance.now();
+  var dt = (now - gameState.lastTime) / 1000;
+  gameState.lastTime = now;
+  dt = Math.min(dt, 0.05);
+  
+  if (!gameState.running || gameState.paused) {
+    renderer.render(scene, camera);
+    return;
+  }
+  
+  gameState.elapsedTime += dt;
+  
+  // الوقت
+  gameState.timeLeft -= dt;
+  if (gameState.timeLeft <= 0) {
+    gameState.timeLeft = 0;
+    endGame();
+    return;
+  }
+  
+  // توليد الركاب
+  gameState.spawnTimer -= dt;
+  if (gameState.spawnTimer <= 0) {
+    if (passengers.length < CONFIG.maxPassengers && !player.hasPassenger) {
+      spawnPassenger();
+    }
+    gameState.spawnTimer = 2 + Math.random() * 2;
+  }
+  
+  // التحديثات
+  updateTukTukPhysics(dt);
+  checkPassengerPickup();
+  checkDelivery();
+  updateCamera(dt);
+  updatePassengers(dt);
+  updatePeople(dt);
+  updateCars(dt);
+  updateTrafficLights(dt);
+  updatePoliceCheckpoints(dt);
+  
+  // الصوت
+  var isAccelerating = !!(keys['KeyW'] || keys['ArrowUp'] || mobileInput.accel);
+  AudioSystem.updateEngine(Math.abs(player.speed), CONFIG.maxSpeed, isAccelerating);
+  
+  // الشمس
+  sunLight.position.set(tukTuk.position.x + 100, 200, tukTuk.position.z + 80);
+  sunLight.target.position.copy(tukTuk.position);
+  sunLight.target.updateMatrixWorld();
+  
+  // HUD
+  updateHUD();
+  drawMinimap();
+  
+  renderer.render(scene, camera);
+}
+
+/* ============================================================
+   🏗️ بناء المدينة الكاملة
+   ============================================================ */
+async function buildCity(onProgress) {
+  var steps = [
+    { name: 'إنشاء الأرضية...', fn: createGround, weight: 3 },
+    { name: 'بناء ترعة المحمودية...', fn: createCanal, weight: 7 },
+    { name: 'رصف الشوارع...', fn: createRoads, weight: 12 },
+    { name: 'مد السكة الحديد...', fn: createRailway, weight: 3 },
+    { name: 'زراعة النخيل والأشجار...', fn: createFoliage, weight: 8 },
+    { name: 'بناء المباني...', fn: createBuildings, weight: 18 },
+    { name: 'بناء المعالم الحقيقية...', fn: createLandmarks, weight: 12 },
+    { name: 'فتح القهاوي الشعبية...', fn: createCafes, weight: 7 },
+    { name: 'إضافة الناس...', fn: createPeople, weight: 8 },
+    { name: 'إضافة السيارات...', fn: createCars, weight: 5 },
+    { name: 'تركيب إشارات المرور...', fn: createTrafficLights, weight: 3 },
+    { name: 'نصب اللجان الأمنية...', fn: createPoliceCheckpoints, weight: 4 },
+    { name: 'تركيب الخريطة...', fn: initMinimap, weight: 2 },
+    { name: 'تشغيل الراديو...', fn: function() {
+      radio.init();
+      setupRadio();
+    }, weight: 3 },
+  ];
+  
+  var accumulated = 0;
+  var totalWeight = steps.reduce(function(sum, s) { return sum + s.weight; }, 0);
+  
+  for (var i = 0; i < steps.length; i++) {
+    var step = steps[i];
+    if (onProgress) onProgress(Math.round((accumulated / totalWeight) * 100), step.name);
+    
+    await new Promise(function(resolve) {
+      setTimeout(function() {
+        try { step.fn(); } catch (e) { console.error('خطأ في', step.name, e); }
+        resolve();
+      }, 20);
+    });
+    
+    accumulated += step.weight;
+  }
+  
+  if (onProgress) onProgress(100, 'جاهز للانطلاق! 🚀');
+}
+
+/* ============================================================
+   🚀 بدء اللعبة
+   ============================================================ */
+var isInitialized = false;
+
+async function startGame() {
+  console.log('🎬 بدء اللعبة...');
+  
+  AudioSystem.init();
+  AudioSystem.resume();
+  
+  if (isInitialized) {
+    resetGame();
+    gameState.running = true;
+    gameState.paused = false;
+    
+    UI.loadingScreen.classList.add('hidden');
+    UI.startScreen.classList.remove('visible');
+    UI.endScreen.classList.remove('visible');
+    UI.hud.classList.add('visible');
+    UI.missionPanel.classList.add('visible');
+    UI.pauseBtn.style.display = 'flex';
+    UI.radioBtn.style.display = 'flex';
+    UI.fullscreenBtn.style.display = 'flex';
+    
+    if (isMobile) {
+      UI.controls.classList.add('visible');
+      UI.showHint('استخدم الأزرار للقيادة', 5000);
+    } else {
+      UI.showHint('W/A/S/D للحركة — H كلاكس — R راديو', 5000);
+    }
+    
+    if (player.engineOn) AudioSystem.setEngine(true);
+    gameState.lastTime = performance.now();
+    return;
+  }
+  
+  UI.startBtn.disabled = true;
+  UI.startBtn.textContent = '⏳ جاري التحميل...';
+  
+  try {
+    await buildCity(function(pct, text) {
+      UI.updateLoading(pct, text);
+    });
+    
+    setupMobileButtons();
+    isInitialized = true;
+    
+    resetGame();
+    gameState.running = true;
+    gameState.lastTime = performance.now();
+    
+    UI.loadingScreen.classList.add('hidden');
+    UI.startScreen.classList.remove('visible');
+    UI.endScreen.classList.remove('visible');
+    UI.hud.classList.add('visible');
+    UI.missionPanel.classList.add('visible');
+    UI.pauseBtn.style.display = 'flex';
+    UI.radioBtn.style.display = 'flex';
+    UI.fullscreenBtn.style.display = 'flex';
+    
+    if (isMobile) {
+      UI.controls.classList.add('visible');
+      UI.showHint('استخدم الأزرار للقيادة', 5000);
+    } else {
+      UI.showHint('W/A/S/D للحركة — H كلاكس — R راديو', 5000);
+    }
+    
+    if (player.engineOn) AudioSystem.setEngine(true);
+    
+    setTimeout(function() { spawnPassenger(); }, 500);
+    setTimeout(function() { spawnPassenger(); }, 1500);
+    
+    UI.showToast('🛺 يلا بينا يا معلم!', 2500);
+    UI.showDialog('أهلاً يا باشا، أنا سواق التوك توك', 3000);
+    
+    if (!animate.started) {
+      animate.started = true;
+      gameState.lastTime = performance.now();
+      animate();
+    }
+    
+    console.log('✅ اللعبة بدأت!');
+    
+  } catch (error) {
+    console.error('❌ خطأ:', error);
+    UI.showToast('حدث خطأ أثناء التحميل', 3000);
+    UI.startBtn.disabled = false;
+    UI.startBtn.textContent = '🚀 ابدأ الشغل';
+  }
+}
+
+/* ============================================================
+   🔄 إعادة التعيين
+   ============================================================ */
+function resetGame() {
+  gameState.money = 0;
+  gameState.deliveries = 0;
+  gameState.ratingSum = 0;
+  gameState.timeLeft = CONFIG.gameDuration;
+  gameState.spawnTimer = 1;
+  gameState.elapsedTime = 0;
+  gameState.paused = false;
+  gameState.dialogTimer = 5;
+  gameState.trafficWarnTimer = 5;
+  
+  tukTuk.position.set(0, 0, 150);
+  tukTuk.rotation.set(0, 0, 0);
+  
+  player.speed = 0;
+  player.steering = 0;
+  player.currentWheelAngle = 0;
+  player.hasPassenger = false;
+  player.currentPassenger = null;
+  player.engineOn = true;
+  player.handbrake = false;
+  
+  for (var i = 0; i < passengers.length; i++) {
+    scene.remove(passengers[i].mesh);
+  }
+  passengers.length = 0;
+  
+  if (activeDestination) {
+    scene.remove(activeDestination);
+    activeDestination = null;
+  }
+  
+  if (tukTuk.userData.passengerRider) {
+    tukTuk.remove(tukTuk.userData.passengerRider);
+    tukTuk.userData.passengerRider = null;
+  }
+  
+  camera.position.set(
+    tukTuk.position.x,
+    CAMERA_HEIGHT,
+    tukTuk.position.z - CAMERA_DISTANCE
+  );
+  camera.lookAt(
+    tukTuk.position.x,
+    CAMERA_LOOK_HEIGHT,
+    tukTuk.position.z
+  );
+  
+  updateHUD();
+  updateMissionUI();
+}
+
+/* ============================================================
+   ⏸️ إيقاف مؤقت
+   ============================================================ */
+function togglePause() {
+  if (!gameState.running) return;
+  gameState.paused = !gameState.paused;
+  
+  if (gameState.paused) {
+    UI.pauseBtn.textContent = '▶️';
+    UI.showToast('⏸️ اللعبة متوقفة', 1500);
+    AudioSystem.setEngine(false);
+    if (radio.isPlaying) radio.pause();
+  } else {
+    UI.pauseBtn.textContent = '⏸️';
+    UI.showToast('▶️ يلا بينا!', 1000);
+    if (player.engineOn) AudioSystem.setEngine(true);
+    gameState.lastTime = performance.now();
+  }
+}
+
+/* ============================================================
+   🏁 إنهاء اللعبة
+   ============================================================ */
+function endGame() {
+  gameState.running = false;
+  AudioSystem.setEngine(false);
+  if (radio.isPlaying) radio.pause();
+  
+  var avgRating = gameState.deliveries > 0
+    ? (gameState.ratingSum / gameState.deliveries).toFixed(1)
+    : '0';
+  
+  UI.endTitle.textContent = gameState.deliveries > 0 ? '🎉 يوم شغل جميل يا معلم!' : '⏰ خلص الوقت!';
+  UI.endMoney.textContent = gameState.money + ' جنيه';
+  UI.endDeliveries.textContent = gameState.deliveries;
+  UI.endRating.textContent = avgRating + ' ⭐';
+  
+  UI.endScreen.classList.add('visible');
+  UI.controls.classList.remove('visible');
+  UI.pauseBtn.style.display = 'none';
+  UI.radioBtn.style.display = 'none';
+  UI.fullscreenBtn.style.display = 'none';
+  
+  console.log('🏁 انتهت اللعبة');
+}
+
+/* ============================================================
+   ⛶ ملء الشاشة
+   ============================================================ */
+function toggleFullscreen() {
+  if (!document.fullscreenElement) {
+    if (document.documentElement.requestFullscreen) {
+      document.documentElement.requestFullscreen();
+    } else if (document.documentElement.webkitRequestFullscreen) {
+      document.documentElement.webkitRequestFullscreen();
+    }
+  } else {
+    if (document.exitFullscreen) {
+      document.exitFullscreen();
+    } else if (document.webkitExitFullscreen) {
+      document.webkitExitFullscreen();
+    }
+  }
+}
+
+/* ============================================================
+   🔗 ربط الأزرار
+   ============================================================ */
+if (UI.startBtn) {
+  UI.startBtn.addEventListener('click', function(e) {
+    e.preventDefault();
+    startGame();
+  });
+  
+  UI.startBtn.addEventListener('touchstart', function(e) {
+    e.preventDefault();
+    startGame();
+  }, { passive: false });
+}
+
+if (UI.restartBtn) {
+  UI.restartBtn.addEventListener('click', function() {
+    UI.endScreen.classList.remove('visible');
+    startGame();
+  });
+}
+
+if (UI.pauseBtn) {
+  UI.pauseBtn.addEventListener('click', togglePause);
+}
+
+if (UI.fullscreenBtn) {
+  UI.fullscreenBtn.addEventListener('click', toggleFullscreen);
+}
+
+document.addEventListener('keydown', function(e) {
+  if (e.code === 'Escape' || e.code === 'KeyP') {
+    if (gameState.running) togglePause();
+  }
+});
+
+document.addEventListener('contextmenu', function(e) { e.preventDefault(); });
+
+console.log('✅ الجزء 3 من game.js جاهز - القيادة والركاب والخريطة والراديو');
+console.log('🎮 اللعبة جاهزة! اضغط "🚀 ابدأ الشغل"');
