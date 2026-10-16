@@ -997,6 +997,1617 @@ window._GAME = {
   sunLight: sunLight,
 };
 
-console.log('✅ الجزء 1 من game.js جاهز - الإعدادات والمدينة');
+/* ============================================================
+   🛺 الجزء 2: التوك توك + الناس + القهاوي + السيارات
+   ============================================================ */
+
+/* ============================================================
+   المباني الاحترافية
+   ============================================================ */
+function isOnRoad(x, z, pad) {
+  pad = pad || 0;
+  for (var i = 0; i < ROADS_DATA.length; i++) {
+    var r = ROADS_DATA[i];
+    var hw = r.width / 2 + CONFIG.sidewalkWidth + pad;
+    var hl = r.length / 2 + pad;
+    var dx = x - r.x, dz = z - r.z;
+    var c = Math.cos(-r.rotation), s = Math.sin(-r.rotation);
+    var lx = dx * c - dz * s, lz = dx * s + dz * c;
+    if (Math.abs(lx) < hw && Math.abs(lz) < hl) return true;
+  }
+  return false;
+}
+
+function isNearLandmark(x, z, radius) {
+  radius = radius || 45;
+  for (var i = 0; i < DESTINATIONS_DATA.length; i++) {
+    var d = DESTINATIONS_DATA[i];
+    if (Math.abs(x - d.x) < radius && Math.abs(z - d.z) < radius) return true;
+  }
+  return false;
+}
+
+/* ============================================================
+   مبنى احترافي واحد
+   ============================================================ */
+function createDetailedBuilding(x, z, w, d, h) {
+  var g = new THREE.Group();
+  var style = Math.floor(Math.random() * 4);
+  var wallMat, roofMat, trimMat;
+  
+  // اختيار النمط
+  if (style === 0) {
+    // سكني عادي - بيج
+    wallMat = Utils.pick([MAT.plaster, MAT.plasterPink, MAT.concrete, MAT.plasterYellow]);
+    roofMat = MAT.tiles;
+    trimMat = MAT.concrete;
+  } else if (style === 1) {
+    // تجاري - ألوان فاتحة + محل
+    wallMat = Utils.pick([MAT.plasterYellow, MAT.plasterBlue, MAT.plasterGreen]);
+    roofMat = MAT.tilesRed;
+    trimMat = MAT.plaster;
+  } else if (style === 2) {
+    // عمارة كبيرة - بلكونات
+    wallMat = Utils.pick([MAT.plasterGreen, MAT.plasterYellow, MAT.plasterPink]);
+    roofMat = MAT.tilesRed;
+    trimMat = MAT.plaster;
+  } else {
+    // طوب
+    wallMat = Utils.pick([MAT.brick, MAT.brickDark, MAT.plaster]);
+    roofMat = MAT.tiles;
+    trimMat = MAT.concrete;
+  }
+  
+  // الدور الأرضي (أغمق)
+  var groundFloorH = 3.5;
+  var groundMat = style === 3 ? MAT.brickDark : MAT.concrete;
+  
+  var groundFloor = new THREE.Mesh(
+    new THREE.BoxGeometry(w + 0.2, groundFloorH, d + 0.2),
+    groundMat
+  );
+  groundFloor.position.y = groundFloorH / 2;
+  g.add(groundFloor);
+  
+  // باقي الأدوار
+  var upperH = h - groundFloorH;
+  if (upperH > 0) {
+    var upperFloors = new THREE.Mesh(
+      new THREE.BoxGeometry(w, upperH, d),
+      wallMat
+    );
+    upperFloors.position.y = groundFloorH + upperH / 2;
+    g.add(upperFloors);
+  }
+  
+  // السقف
+  var roofBase = new THREE.Mesh(
+    new THREE.BoxGeometry(w + 0.5, 0.4, d + 0.5),
+    roofMat
+  );
+  roofBase.position.y = h + 0.2;
+  g.add(roofBase);
+  
+  // سور السطح (بارابيت)
+  var parapetH = 0.7;
+  for (var s = -1; s <= 1; s += 2) {
+    var p1 = new THREE.Mesh(
+      new THREE.BoxGeometry(0.2, parapetH, d + 0.5),
+      trimMat
+    );
+    p1.position.set(s * (w / 2 + 0.15), h + 0.6, 0);
+    g.add(p1);
+    
+    var p2 = new THREE.Mesh(
+      new THREE.BoxGeometry(w + 0.5, parapetH, 0.2),
+      trimMat
+    );
+    p2.position.set(0, h + 0.6, s * (d / 2 + 0.15));
+    g.add(p2);
+  }
+  
+  // واجهة المحل أو الباب
+  if (style === 1 || Math.random() > 0.5) {
+    // واجهة محل زجاجية
+    var shopWin = new THREE.Mesh(
+      new THREE.BoxGeometry(w * 0.75, 2.2, 0.15),
+      MAT.glass
+    );
+    shopWin.position.set(0, 1.7, d / 2 + 0.12);
+    g.add(shopWin);
+    
+    // إطار المحل
+    var shopFrame = new THREE.Mesh(
+      new THREE.BoxGeometry(w * 0.8, 2.5, 0.1),
+      MAT.metalDoor
+    );
+    shopFrame.position.set(0, 1.7, d / 2 + 0.05);
+    g.add(shopFrame);
+    
+    // مظلة المحل
+    var awningColor = Utils.pick(MAT.shopAwning);
+    var awning = new THREE.Mesh(
+      new THREE.BoxGeometry(w * 0.85, 0.15, 1.6),
+      awningColor
+    );
+    awning.position.set(0, 3.1, d / 2 + 0.8);
+    awning.rotation.x = -0.25;
+    g.add(awning);
+    
+    // لافتة المحل
+    var signColor = Utils.pick([0xe74c3c, 0x3498db, 0xf39c12, 0x2ecc71, 0x9b59b6]);
+    var shopSign = new THREE.Mesh(
+      new THREE.BoxGeometry(w * 0.65, 0.9, 0.15),
+      new THREE.MeshLambertMaterial({ color: signColor })
+    );
+    shopSign.position.set(0, 3.7, d / 2 + 0.1);
+    g.add(shopSign);
+  } else {
+    // باب عادي
+    var door = new THREE.Mesh(
+      new THREE.BoxGeometry(1.4, 2.5, 0.15),
+      style === 3 ? MAT.metalDoor : MAT.woodDoor
+    );
+    door.position.set(0, 1.25, d / 2 + 0.12);
+    g.add(door);
+    
+    // إطار الباب
+    var doorFrame = new THREE.Mesh(
+      new THREE.BoxGeometry(1.8, 2.8, 0.08),
+      trimMat
+    );
+    doorFrame.position.set(0, 1.4, d / 2 + 0.06);
+    g.add(doorFrame);
+    
+    // مظلة صغيرة فوق الباب
+    var smallAwning = new THREE.Mesh(
+      new THREE.BoxGeometry(2.5, 0.1, 1),
+      trimMat
+    );
+    smallAwning.position.set(0, 2.8, d / 2 + 0.5);
+    smallAwning.rotation.x = -0.2;
+    g.add(smallAwning);
+  }
+  
+  // نوافذ الأدوار العلوية
+  var floors = Math.max(1, Math.floor((h - groundFloorH) / 3));
+  var winCols = Math.max(2, Math.floor(w / 3));
+  
+  for (var f = 0; f < floors; f++) {
+    var winY = groundFloorH + 1.5 + f * 3;
+    
+    for (var c = 0; c < winCols; c++) {
+      var winX = -w / 2 + 1.5 + c * (w / winCols);
+      
+      // نافذة أمامية + إطار
+      var winFrame = new THREE.Mesh(
+        new THREE.BoxGeometry(1.3, 1.6, 0.15),
+        trimMat
+      );
+      winFrame.position.set(winX, winY, d / 2 + 0.05);
+      g.add(winFrame);
+      
+      var winGlass = new THREE.Mesh(
+        new THREE.BoxGeometry(1, 1.3, 0.05),
+        MAT.window
+      );
+      winGlass.position.set(winX, winY, d / 2 + 0.12);
+      g.add(winGlass);
+      
+      // شرفة في بعض النوافذ
+      if (f > 0 && Math.random() > 0.6) {
+        var balcony = new THREE.Mesh(
+          new THREE.BoxGeometry(1.8, 0.15, 1),
+          MAT.concrete
+        );
+        balcony.position.set(winX, winY - 0.9, d / 2 + 0.5);
+        g.add(balcony);
+        
+        var rail = new THREE.Mesh(
+          new THREE.BoxGeometry(1.8, 0.7, 0.08),
+          MAT.balconyRail
+        );
+        rail.position.set(winX, winY - 0.5, d / 2 + 0.95);
+        g.add(rail);
+        
+        // وحدة تكييف على الشرفة
+        if (Math.random() > 0.5) {
+          var ac = new THREE.Mesh(
+            new THREE.BoxGeometry(0.7, 0.5, 0.3),
+            MAT.acUnit
+          );
+          ac.position.set(winX - 0.6, winY - 1, d / 2 + 0.7);
+          g.add(ac);
+        }
+      }
+    }
+  }
+  
+  // طبق دش
+  if (Math.random() > 0.5) {
+    var dish = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.5, 0.5, 0.1, 12),
+      MAT.satellite
+    );
+    dish.position.set(Utils.rand(-w / 3, w / 3), h + 0.9, Utils.rand(-d / 3, d / 3));
+    dish.rotation.z = Utils.rand(-0.3, 0.3);
+    g.add(dish);
+  }
+  
+  g.position.set(x, 0, z);
+  return g;
+}
+
+function createBuildings() {
+  var group = new THREE.Group();
+  var grid = 44;
+  var half = CONFIG.citySize / 2;
+  var buildingList = [];
+  
+  for (var gx = -half; gx < half; gx += grid) {
+    for (var gz = -half; gz < half; gz += grid) {
+      var x = gx + grid / 2 + Utils.rand(-2, 2);
+      var z = gz + grid / 2 + Utils.rand(-2, 2);
+      
+      if (isOnRoad(x, z, 5)) continue;
+      if (Math.abs(z) < CONFIG.canalWidth / 2 + 10) continue;
+      if (Math.abs(x + 260) < 18) continue;
+      if (Math.abs(x) < 22 && Math.abs(z) < 25) continue;
+      if (isNearLandmark(x, z, 45)) continue;
+      
+      // منطقة القهاوي (شارع أحمد عرابي)
+      if (Math.abs(z + 15) < 30 && Math.abs(x) < 200 && Math.random() > 0.5) continue;
+      
+      if (Math.random() > QUALITY.buildingDensity) continue;
+      if (buildingList.length >= QUALITY.maxBuildings) break;
+      
+      buildingList.push({
+        x: x, z: z,
+        w: Utils.rand(10, 17),
+        d: Utils.rand(10, 17),
+        h: Utils.rand(6, 20)
+      });
+    }
+  }
+  
+  console.log('🏢 بناء', buildingList.length, 'مبنى');
+  
+  // المباني المفصلة (القريبة من المركز)
+  var detailedCount = Math.min(QUALITY.detailedBuildings, buildingList.length);
+  var detailed = [];
+  var simple = [];
+  
+  // نختار الأقرب للمركز للتفصيل
+  buildingList.sort(function(a, b) {
+    return (a.x * a.x + a.z * a.z) - (b.x * b.x + b.z * b.z);
+  });
+  
+  for (var i = 0; i < buildingList.length; i++) {
+    if (i < detailedCount) detailed.push(buildingList[i]);
+    else simple.push(buildingList[i]);
+  }
+  
+  // المباني المفصلة
+  for (var i = 0; i < detailed.length; i++) {
+    var b = detailed[i];
+    group.add(createDetailedBuilding(b.x, b.z, b.w, b.d, b.h));
+  }
+  
+  // الباقي - InstancedMesh
+  if (simple.length > 0) {
+    var boxGeo = new THREE.BoxGeometry(1, 1, 1);
+    var wallMats = [MAT.plaster, MAT.plasterPink, MAT.plasterYellow, 
+                    MAT.plasterBlue, MAT.plasterGreen, MAT.concrete];
+    
+    for (var c = 0; c < wallMats.length; c++) {
+      var filtered = [];
+      for (var i = 0; i < simple.length; i++) {
+        if (i % wallMats.length === c) filtered.push(simple[i]);
+      }
+      if (filtered.length === 0) continue;
+      
+      var instMesh = new THREE.InstancedMesh(boxGeo, wallMats[c], filtered.length);
+      var matrix = new THREE.Matrix4();
+      for (var i = 0; i < filtered.length; i++) {
+        var b = filtered[i];
+        matrix.makeScale(b.w, b.h, b.d);
+        matrix.setPosition(b.x, b.h / 2, b.z);
+        instMesh.setMatrixAt(i, matrix);
+      }
+      instMesh.instanceMatrix.needsUpdate = true;
+      group.add(instMesh);
+    }
+  }
+  
+  scene.add(group);
+}
+
+/* ============================================================
+   المعالم الحقيقية المفصلة
+   ============================================================ */
+function createMosque(x, z) {
+  var g = new THREE.Group();
+  
+  // القاعدة
+  var base = new THREE.Mesh(new THREE.BoxGeometry(20, 10, 20), MAT.mosqueWall);
+  base.position.y = 5;
+  g.add(base);
+  
+  // القبة
+  var dome = new THREE.Mesh(
+    new THREE.SphereGeometry(6, 20, 14, 0, Math.PI * 2, 0, Math.PI / 2),
+    MAT.mosqueDome
+  );
+  dome.position.y = 10;
+  g.add(dome);
+  
+  // الطبلة تحت القبة
+  var drum = new THREE.Mesh(
+    new THREE.CylinderGeometry(6, 6, 1.5, 20),
+    MAT.mosqueWall
+  );
+  drum.position.y = 10;
+  g.add(drum);
+  
+  // الرأس الذهبي
+  var finial = new THREE.Mesh(new THREE.ConeGeometry(0.8, 3, 8), MAT.mosqueGold);
+  finial.position.y = 17;
+  g.add(finial);
+  
+  var ball = new THREE.Mesh(new THREE.SphereGeometry(0.5, 12, 12), MAT.mosqueGold);
+  ball.position.y = 15.5;
+  g.add(ball);
+  
+  // مآذن
+  for (var s = -1; s <= 1; s += 2) {
+    var minaret = new THREE.Mesh(
+      new THREE.CylinderGeometry(1, 1, 22, 10),
+      MAT.mosqueWall
+    );
+    minaret.position.set(s * 11, 11, 0);
+    g.add(minaret);
+    
+    // شرفة المأذنة
+    var balcony = new THREE.Mesh(
+      new THREE.CylinderGeometry(1.4, 1.4, 0.6, 10),
+      MAT.mosqueWall
+    );
+    balcony.position.set(s * 11, 18, 0);
+    g.add(balcony);
+    
+    // قمة المأذنة
+    var mTop = new THREE.Mesh(new THREE.ConeGeometry(1.5, 4, 10), MAT.mosqueDome);
+    mTop.position.set(s * 11, 24, 0);
+    g.add(mTop);
+    
+    var mFinial = new THREE.Mesh(new THREE.ConeGeometry(0.5, 2, 8), MAT.mosqueGold);
+    mFinial.position.set(s * 11, 27, 0);
+    g.add(mFinial);
+  }
+  
+  // أبواب
+  for (var i = -1; i <= 1; i++) {
+    var door = new THREE.Mesh(
+      new THREE.BoxGeometry(2.5, 5, 0.4),
+      new THREE.MeshLambertMaterial({ color: 0x5a3a1a })
+    );
+    door.position.set(i * 5, 2.5, 10.1);
+    g.add(door);
+  }
+  
+  // نوافذ مقوسة
+  for (var i = -2; i <= 2; i++) {
+    if (i === 0) continue;
+    var win = new THREE.Mesh(new THREE.BoxGeometry(1.8, 3, 0.15), MAT.window);
+    win.position.set(i * 3, 6, 10.05);
+    g.add(win);
+  }
+  
+  g.position.set(x, 0, z);
+  return g;
+}
+
+function createStation(x, z) {
+  var g = new THREE.Group();
+  
+  var main = new THREE.Mesh(new THREE.BoxGeometry(32, 9, 14), MAT.stationWall);
+  main.position.y = 4.5;
+  g.add(main);
+  
+  var roof = new THREE.Mesh(new THREE.BoxGeometry(34, 0.8, 16), MAT.stationRoof);
+  roof.position.y = 9.4;
+  g.add(roof);
+  
+  // برج الساعة
+  var tower = new THREE.Mesh(new THREE.BoxGeometry(5, 16, 5), MAT.stationWall);
+  tower.position.set(11, 12, 0);
+  g.add(tower);
+  
+  var towerRoof = new THREE.Mesh(new THREE.ConeGeometry(3.5, 4, 4), MAT.stationRoof);
+  towerRoof.position.set(11, 22, 0);
+  towerRoof.rotation.y = Math.PI / 4;
+  g.add(towerRoof);
+  
+  // الساعة
+  var clockFace = new THREE.Mesh(
+    new THREE.CircleGeometry(1.8, 24),
+    new THREE.MeshBasicMaterial({ color: 0xffffff })
+  );
+  clockFace.position.set(11, 16, 2.55);
+  g.add(clockFace);
+  
+  var clockRing = new THREE.Mesh(
+    new THREE.TorusGeometry(1.8, 0.15, 8, 24),
+    new THREE.MeshBasicMaterial({ color: 0x333333 })
+  );
+  clockRing.position.set(11, 16, 2.56);
+  g.add(clockRing);
+  
+  // عقارب
+  var hand1 = new THREE.Mesh(
+    new THREE.BoxGeometry(0.15, 1.2, 0.05),
+    new THREE.MeshBasicMaterial({ color: 0x000000 })
+  );
+  hand1.position.set(11, 16.6, 2.6);
+  g.add(hand1);
+  
+  var hand2 = new THREE.Mesh(
+    new THREE.BoxGeometry(0.9, 0.15, 0.05),
+    new THREE.MeshBasicMaterial({ color: 0x000000 })
+  );
+  hand2.position.set(11.45, 16, 2.6);
+  g.add(hand2);
+  
+  // نوافذ
+  for (var i = -12; i <= 12; i += 4) {
+    var win = new THREE.Mesh(new THREE.BoxGeometry(2.8, 4, 0.15), MAT.window);
+    win.position.set(i, 5, 7.05);
+    g.add(win);
+    
+    var frame = new THREE.Mesh(
+      new THREE.BoxGeometry(3.1, 4.3, 0.1),
+      MAT.metalDoor
+    );
+    frame.position.set(i, 5, 7.0);
+    g.add(frame);
+  }
+  
+  g.position.set(x, 0, z);
+  return g;
+}
+
+function createFactory(x, z) {
+  var g = new THREE.Group();
+  
+  var main = new THREE.Mesh(new THREE.BoxGeometry(48, 16, 36), MAT.factoryWall);
+  main.position.y = 8;
+  g.add(main);
+  
+  var roof = new THREE.Mesh(
+    new THREE.BoxGeometry(49, 0.5, 37),
+    new THREE.MeshLambertMaterial({ color: 0x6a6a6a })
+  );
+  roof.position.y = 16.25;
+  g.add(roof);
+  
+  // 3 مداخن
+  for (var i = 0; i < 3; i++) {
+    var chimney = new THREE.Mesh(
+      new THREE.CylinderGeometry(1.8, 2.2, 32, 12),
+      MAT.factoryChimney
+    );
+    chimney.position.set(-15 + i * 15, 24, -14);
+    g.add(chimney);
+    
+    var band1 = new THREE.Mesh(
+      new THREE.CylinderGeometry(1.9, 1.9, 1.5),
+      new THREE.MeshLambertMaterial({ color: 0xcc0000 })
+    );
+    band1.position.set(-15 + i * 15, 32, -14);
+    g.add(band1);
+    
+    var band2 = new THREE.Mesh(
+      new THREE.CylinderGeometry(1.9, 1.9, 1.5),
+      new THREE.MeshLambertMaterial({ color: 0xcc0000 })
+    );
+    band2.position.set(-15 + i * 15, 38, -14);
+    g.add(band2);
+  }
+  
+  // نوافذ صناعية
+  for (var i = 0; i < 12; i++) {
+    var w1 = new THREE.Mesh(new THREE.BoxGeometry(2.5, 3, 0.15), MAT.window);
+    w1.position.set(-20 + i * 3.7, 5, 18.05);
+    g.add(w1);
+    
+    var w2 = new THREE.Mesh(new THREE.BoxGeometry(2.5, 3, 0.15), MAT.window);
+    w2.position.set(-20 + i * 3.7, 11, 18.05);
+    g.add(w2);
+  }
+  
+  g.position.set(x, 0, z);
+  return g;
+}
+
+function createHospital(x, z) {
+  var g = new THREE.Group();
+  
+  var main = new THREE.Mesh(new THREE.BoxGeometry(30, 16, 22), MAT.hospitalWall);
+  main.position.y = 8;
+  g.add(main);
+  
+  var tower = new THREE.Mesh(new THREE.BoxGeometry(14, 22, 14), MAT.hospitalWall);
+  tower.position.set(-6, 11, 0);
+  g.add(tower);
+  
+  // شريط أحمر
+  var stripe = new THREE.Mesh(
+    new THREE.BoxGeometry(30.5, 1, 22.5),
+    new THREE.MeshLambertMaterial({ color: 0xcc0000 })
+  );
+  stripe.position.y = 3;
+  g.add(stripe);
+  
+  // الهلال الأحمر
+  var crescent = new THREE.Mesh(
+    new THREE.TorusGeometry(3, 0.8, 8, 20, Math.PI * 1.6),
+    MAT.hospitalRed
+  );
+  crescent.position.set(8, 12, 11.1);
+  crescent.rotation.z = -Math.PI / 2;
+  g.add(crescent);
+  
+  // صليب أحمر
+  var crossV = new THREE.Mesh(new THREE.BoxGeometry(1, 4, 0.3), MAT.hospitalRed);
+  crossV.position.set(-6, 24, 7.1);
+  g.add(crossV);
+  
+  var crossH = new THREE.Mesh(new THREE.BoxGeometry(4, 1, 0.3), MAT.hospitalRed);
+  crossH.position.set(-6, 24, 7.1);
+  g.add(crossH);
+  
+  g.position.set(x, 0, z);
+  return g;
+}
+
+function createSouk(x, z) {
+  var g = new THREE.Group();
+  var colors = [0xe74c3c, 0x3498db, 0xf39c12, 0x2ecc71, 0x9b59b6, 0xe67e22, 0x1abc9c];
+  
+  for (var i = 0; i < 14; i++) {
+    var angle = (i / 14) * Math.PI * 2;
+    var cx = Math.cos(angle) * 11;
+    var cz = Math.sin(angle) * 11;
+    
+    var stall = new THREE.Mesh(
+      new THREE.BoxGeometry(3, 2.5, 3),
+      new THREE.MeshLambertMaterial({ color: colors[i % colors.length] })
+    );
+    stall.position.set(cx, 1.25, cz);
+    g.add(stall);
+    
+    var awning = new THREE.Mesh(
+      new THREE.ConeGeometry(2.8, 1.8, 4),
+      new THREE.MeshLambertMaterial({ color: 0xf5f5f5 })
+    );
+    awning.position.set(cx, 3.6, cz);
+    awning.rotation.y = Math.PI / 4;
+    g.add(awning);
+  }
+  
+  g.position.set(x, 0, z);
+  return g;
+}
+
+function createBusStop(x, z, color) {
+  var g = new THREE.Group();
+  
+  var sign = new THREE.Mesh(
+    new THREE.BoxGeometry(4, 2.5, 0.2),
+    new THREE.MeshLambertMaterial({ color: color })
+  );
+  sign.position.y = 3;
+  g.add(sign);
+  
+  for (var s = -1; s <= 1; s += 2) {
+    var pole = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.1, 0.1, 4),
+      MAT.metalDoor
+    );
+    pole.position.set(s * 1.5, 2, 0);
+    g.add(pole);
+  }
+  
+  var roof = new THREE.Mesh(
+    new THREE.BoxGeometry(6, 0.2, 4),
+    MAT.metalDoor
+  );
+  roof.position.y = 4.2;
+  g.add(roof);
+  
+  g.position.set(x, 0, z);
+  return g;
+}
+
+function createLandmarks() {
+  console.log('🏛️ بناء المعالم...');
+  var group = new THREE.Group();
+  
+  group.add(createStation(-230, -80));
+  group.add(createMosque(-120, 200));
+  group.add(createFactory(380, -280));
+  group.add(createHospital(-520, 150));
+  group.add(createSouk(100, 180));
+  group.add(createBusStop(170, 70, 0xe74c3c));
+  group.add(createBusStop(-140, -100, 0xf39c12));
+  group.add(createBusStop(380, 100, 0xe67e22));
+  group.add(createBusStop(520, -20, 0x2980b9));
+  
+  scene.add(group);
+}
+
+/* ============================================================
+   ☕ القهاوي الشعبية المصرية
+   ============================================================ */
+var cafes = [];
+
+function createCafe(x, z, rotation) {
+  var g = new THREE.Group();
+  
+  // ===== قاعدة القهوة (بلاط) =====
+  var base = new THREE.Mesh(
+    new THREE.BoxGeometry(10, 0.15, 8),
+    new THREE.MeshLambertMaterial({ color: 0x8a7a6a })
+  );
+  base.position.y = 0.15;
+  g.add(base);
+  
+  // ===== المبنى الأساسي =====
+  var wall = new THREE.Mesh(
+    new THREE.BoxGeometry(10, 4, 6),
+    Utils.pick([MAT.plaster, MAT.plasterYellow, MAT.plasterPink])
+  );
+  wall.position.set(0, 2, -1);
+  g.add(wall);
+  
+  // سقف المبنى
+  var roof = new THREE.Mesh(
+    new THREE.BoxGeometry(10.5, 0.3, 6.5),
+    MAT.tiles
+  );
+  roof.position.set(0, 4.15, -1);
+  g.add(roof);
+  
+  // ===== مظلة القهوة =====
+  var awningMat = new THREE.MeshLambertMaterial({ color: 0x5a3a1a });
+  for (var s = -1; s <= 1; s += 2) {
+    var pole = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.1, 0.1, 4),
+      MAT.woodDoor
+    );
+    pole.position.set(s * 4.8, 2, 3);
+    g.add(pole);
+  }
+  
+  var awning = new THREE.Mesh(
+    new THREE.BoxGeometry(10, 0.1, 3),
+    awningMat
+  );
+  awning.position.set(0, 4, 2);
+  awning.rotation.x = -0.15;
+  g.add(awning);
+  
+  // ===== الطاولات والكراسي =====
+  for (var i = 0; i < 4; i++) {
+    var tx = -3 + i * 2;
+    var tz = 2.5;
+    
+    // الطاولة
+    var table = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.6, 0.6, 0.08, 12),
+      MAT.cafeTable
+    );
+    table.position.set(tx, 0.85, tz);
+    g.add(table);
+    
+    var tableLeg = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.05, 0.05, 0.8, 8),
+      MAT.cafeTable
+    );
+    tableLeg.position.set(tx, 0.4, tz);
+    g.add(tableLeg);
+    
+    // كرسيان
+    for (var c = -1; c <= 1; c += 2) {
+      var chair = new THREE.Mesh(
+        new THREE.BoxGeometry(0.5, 0.08, 0.5),
+        MAT.cafeChair
+      );
+      chair.position.set(tx + c * 0.9, 0.55, tz);
+      g.add(chair);
+      
+      var chairBack = new THREE.Mesh(
+        new THREE.BoxGeometry(0.5, 0.7, 0.08),
+        MAT.cafeChair
+      );
+      chairBack.position.set(tx + c * 0.9, 0.9, tz - 0.2);
+      g.add(chairBack);
+      
+      // أرجل الكرسي
+      for (var lgx = -1; lgx <= 1; lgx += 2) {
+        for (var lgz = -1; lgz <= 1; lgz += 2) {
+          var leg = new THREE.Mesh(
+            new THREE.BoxGeometry(0.05, 0.5, 0.05),
+            MAT.cafeChair
+          );
+          leg.position.set(
+            tx + c * 0.9 + lgx * 0.2,
+            0.25,
+            tz + lgz * 0.2
+          );
+          g.add(leg);
+        }
+      }
+    }
+    
+    // شيشة على الطاولة
+    if (Math.random() > 0.3) {
+      var shishaBase = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.08, 0.1, 0.3, 8),
+        MAT.cafeShisha
+      );
+      shishaBase.position.set(tx + 0.3, 1, tz + 0.2);
+      g.add(shishaBase);
+      
+      var shishaPole = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.03, 0.03, 0.6, 8),
+        MAT.cafeShisha
+      );
+      shishaPole.position.set(tx + 0.3, 1.45, tz + 0.2);
+      g.add(shishaPole);
+      
+      var shishaTop = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.08, 0.08, 0.08, 8),
+        MAT.cafeShishaTop
+      );
+      shishaTop.position.set(tx + 0.3, 1.75, tz + 0.2);
+      g.add(shishaTop);
+    }
+    
+    // كوباية شاي
+    if (Math.random() > 0.4) {
+      var glass = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.05, 0.04, 0.15, 8),
+        MAT.cafeGlass
+      );
+      glass.position.set(tx - 0.3, 0.95, tz + 0.1);
+      g.add(glass);
+    }
+  }
+  
+  // ===== شيشة إضافية أرضية =====
+  if (Math.random() > 0.5) {
+    var groundShisha = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.12, 0.15, 0.4, 8),
+      MAT.cafeShisha
+    );
+    groundShisha.position.set(Utils.rand(-4, 4), 0.35, 1);
+    g.add(groundShisha);
+    
+    var pole2 = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.04, 0.04, 0.8, 8),
+      MAT.cafeShisha
+    );
+    pole2.position.set(groundShisha.position.x, 0.9, 1);
+    g.add(pole2);
+  }
+  
+  // ===== لوحة القهوة =====
+  var signTex = makeTextTexture(
+    Utils.pick(['قهوة الأصدقاء', 'قهوة النصر', 'قهوة الحرية', 'قهوة الترعة', 'قهوة شعبية']),
+    '#5a3a1a',
+    '#ffcc00',
+    512,
+    128
+  );
+  var signMat = new THREE.MeshBasicMaterial({ map: signTex, side: THREE.DoubleSide });
+  var sign = new THREE.Mesh(new THREE.PlaneGeometry(6, 1.5), signMat);
+  sign.position.set(0, 4.8, 0.1);
+  g.add(sign);
+  
+  // ===== ناس قاعدة على الكراسي =====
+  for (var i = 0; i < 3; i++) {
+    var person = createSimpleSittingPerson();
+    person.position.set(Utils.rand(-3, 3), 0.55, 2.5);
+    person.rotation.y = Utils.rand(-0.5, 0.5);
+    g.add(person);
+  }
+  
+  g.position.set(x, 0, z);
+  g.rotation.y = rotation;
+  g.userData = { type: 'cafe' };
+  
+  return g;
+}
+
+// شخص قاعد بسيط للقهوة
+function createSimpleSittingPerson() {
+  var p = new THREE.Group();
+  
+  var shirtMat = Utils.pick(MAT.peopleShirt);
+  var skinMat = Utils.pick(MAT.peopleSkin);
+  var pantsMat = Utils.pick(MAT.peoplePants);
+  
+  // الجسم
+  var torso = new THREE.Mesh(
+    new THREE.BoxGeometry(0.42, 0.55, 0.3),
+    shirtMat
+  );
+  torso.position.y = 0.4;
+  p.add(torso);
+  
+  // الرأس
+  var head = new THREE.Mesh(
+    new THREE.SphereGeometry(0.16, 8, 8),
+    skinMat
+  );
+  head.position.y = 0.85;
+  p.add(head);
+  
+  // كاب أو غطاء رأس (اختياري)
+  if (Math.random() > 0.5) {
+    var cap = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.17, 0.17, 0.06, 8),
+      Utils.pick(MAT.peopleShirt)
+    );
+    cap.position.y = 0.95;
+    p.add(cap);
+  }
+  
+  // الرجلين (مقعدين)
+  var legs = new THREE.Mesh(
+    new THREE.BoxGeometry(0.42, 0.3, 0.5),
+    pantsMat
+  );
+  legs.position.set(0, 0.15, 0.2);
+  p.add(legs);
+  
+  return p;
+}
+
+function createCafes() {
+  console.log('☕ بناء القهاوي...');
+  var group = new THREE.Group();
+  
+  // قهاوي على شارع أحمد عرابي
+  var cafePositions = [
+    { x: -80, z: 0, r: Math.PI },
+    { x: 80, z: 0, r: Math.PI },
+    { x: -160, z: 30, r: 0 },
+    { x: 160, z: 30, r: 0 },
+    { x: -240, z: 0, r: Math.PI },
+    { x: 240, z: 0, r: Math.PI },
+  ];
+  
+  for (var i = 0; i < cafePositions.length; i++) {
+    var cp = cafePositions[i];
+    var cafe = createCafe(cp.x, cp.z, cp.r);
+    group.add(cafe);
+    cafes.push(cafe);
+  }
+  
+  scene.add(group);
+}
+
+/* ============================================================
+   السيارات
+   ============================================================ */
+var cars = [];
+
+function createCar(x, z, rotation) {
+  var car = new THREE.Group();
+  var bodyMat = Utils.pick(MAT.carBody);
+  
+  // الجسم
+  var body = new THREE.Mesh(
+    new THREE.BoxGeometry(1.8, 0.6, 3.8),
+    bodyMat
+  );
+  body.position.y = 0.5;
+  car.add(body);
+  
+  // الكابينة
+  var cabin = new THREE.Mesh(
+    new THREE.BoxGeometry(1.6, 0.5, 1.8),
+    bodyMat
+  );
+  cabin.position.set(0, 1.05, -0.2);
+  car.add(cabin);
+  
+  // زجاج أمامي
+  var windshield = new THREE.Mesh(
+    new THREE.BoxGeometry(1.4, 0.4, 0.1),
+    MAT.glass
+  );
+  windshield.position.set(0, 1.05, 0.7);
+  car.add(windshield);
+  
+  // زجاج خلفي
+  var rearGlass = new THREE.Mesh(
+    new THREE.BoxGeometry(1.4, 0.4, 0.1),
+    MAT.glass
+  );
+  rearGlass.position.set(0, 1.05, -1.1);
+  car.add(rearGlass);
+  
+  // عجلات
+  var tireGeo = new THREE.CylinderGeometry(0.32, 0.32, 0.22, 12);
+  for (var wx = -1; wx <= 1; wx += 2) {
+    for (var wz = -1; wz <= 1; wz += 2) {
+      var tire = new THREE.Mesh(tireGeo, MAT.carTire);
+      tire.rotation.z = Math.PI / 2;
+      tire.position.set(wx * 0.9, 0.32, wz * 1.2);
+      car.add(tire);
+    }
+  }
+  
+  car.position.set(x, 0, z);
+  car.rotation.y = rotation;
+  
+  return car;
+}
+
+function createCars() {
+  var group = new THREE.Group();
+  
+  for (var i = 0; i < QUALITY.carsCount; i++) {
+    var rd = Utils.pick(ROADS_DATA);
+    var off = Utils.rand(-rd.length / 2 + 40, rd.length / 2 - 40);
+    var x = rd.x + Math.sin(rd.rotation) * off;
+    var z = rd.z + Math.cos(rd.rotation) * off;
+    
+    // نضعهم على جانب الشارع
+    var sideOffset = (Math.random() > 0.5 ? 1 : -1) * (rd.width / 4);
+    var dx = Math.cos(rd.rotation) * sideOffset;
+    var dz = -Math.sin(rd.rotation) * sideOffset;
+    
+    var car = createCar(x + dx, z + dz, rd.rotation + (Math.random() > 0.5 ? 0 : Math.PI));
+    car.userData = {
+      road: rd,
+      offset: off,
+      sideOffset: sideOffset,
+      speed: Utils.rand(3, 6),
+      direction: Math.random() > 0.5 ? 1 : -1,
+    };
+    group.add(car);
+    cars.push(car);
+  }
+  
+  scene.add(group);
+}
+
+function updateCars(dt) {
+  for (var i = 0; i < cars.length; i++) {
+    var c = cars[i];
+    var ud = c.userData;
+    
+    ud.offset += ud.speed * ud.direction * dt;
+    
+    if (ud.offset > ud.road.length / 2 - 30) {
+      ud.direction = -1;
+      c.rotation.y = ud.road.rotation + Math.PI;
+    }
+    if (ud.offset < -ud.road.length / 2 + 30) {
+      ud.direction = 1;
+      c.rotation.y = ud.road.rotation;
+    }
+    
+    var x = ud.road.x + Math.sin(ud.road.rotation) * ud.offset;
+    var z = ud.road.z + Math.cos(ud.road.rotation) * ud.offset;
+    
+    var dx = Math.cos(ud.road.rotation) * ud.sideOffset;
+    var dz = -Math.sin(ud.road.rotation) * ud.sideOffset;
+    
+    c.position.x = x + dx;
+    c.position.z = z + dz;
+  }
+}
+
+/* ============================================================
+   الناس الواقعية
+   ============================================================ */
+var people = [];
+
+function createPerson(x, z, type) {
+  var p = new THREE.Group();
+  type = type || 'walker';
+  
+  var shirtMat = Utils.pick(MAT.peopleShirt);
+  var pantsMat = Utils.pick(MAT.peoplePants);
+  var skinMat = Utils.pick(MAT.peopleSkin);
+  var hairMat = Utils.pick(MAT.peopleHair);
+  
+  // ===== الجسم (قميص) =====
+  var torso = new THREE.Mesh(
+    new THREE.BoxGeometry(0.42, 0.65, 0.26),
+    shirtMat
+  );
+  torso.position.y = 1.08;
+  p.add(torso);
+  
+  // ===== الرقبة =====
+  var neck = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.08, 0.08, 0.1),
+    skinMat
+  );
+  neck.position.y = 1.43;
+  p.add(neck);
+  
+  // ===== الرأس =====
+  var head = new THREE.Mesh(
+    new THREE.SphereGeometry(0.17, 10, 10),
+    skinMat
+  );
+  head.position.y = 1.62;
+  p.add(head);
+  
+  // ===== العينان =====
+  var eyeMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
+  for (var s = -1; s <= 1; s += 2) {
+    var eye = new THREE.Mesh(
+      new THREE.SphereGeometry(0.025, 6, 6),
+      eyeMat
+    );
+    eye.position.set(s * 0.06, 1.65, 0.15);
+    p.add(eye);
+  }
+  
+  // ===== الشعر =====
+  var hair = new THREE.Mesh(
+    new THREE.SphereGeometry(0.18, 10, 10, 0, Math.PI * 2, 0, Math.PI / 2),
+    hairMat
+  );
+  hair.position.y = 1.65;
+  p.add(hair);
+  
+  // ===== الأرجل =====
+  var legs = new THREE.Mesh(
+    new THREE.BoxGeometry(0.42, 0.8, 0.26),
+    pantsMat
+  );
+  legs.position.y = 0.35;
+  p.add(legs);
+  
+  // ===== الحذاء =====
+  var shoes = new THREE.Mesh(
+    new THREE.BoxGeometry(0.44, 0.08, 0.32),
+    new THREE.MeshLambertMaterial({ color: 0x1a1a1a })
+  );
+  shoes.position.y = -0.03;
+  p.add(shoes);
+  
+  // ===== الذراعين =====
+  var armGeo = new THREE.BoxGeometry(0.12, 0.58, 0.12);
+  var armL = new THREE.Mesh(armGeo, shirtMat);
+  armL.position.set(-0.27, 1.08, 0);
+  p.add(armL);
+  
+  var armR = new THREE.Mesh(armGeo, shirtMat);
+  armR.position.set(0.27, 1.08, 0);
+  p.add(armR);
+  
+  // ===== الأيدي =====
+  var handGeo = new THREE.SphereGeometry(0.07, 6, 6);
+  var handL = new THREE.Mesh(handGeo, skinMat);
+  handL.position.set(-0.27, 0.78, 0);
+  p.add(handL);
+  
+  var handR = new THREE.Mesh(handGeo, skinMat);
+  handR.position.set(0.27, 0.78, 0);
+  p.add(handR);
+  
+  p.position.set(x, 0, z);
+  p.rotation.y = Utils.rand(0, Math.PI * 2);
+  p.userData = {
+    type: type,
+    direction: Utils.rand(0, Math.PI * 2),
+    speed: type === 'walker' ? Utils.rand(0.8, 1.8) : 0,
+    walkPhase: Math.random() * Math.PI * 2,
+    armL: armL,
+    armR: armR,
+    handL: handL,
+    handR: handR,
+    homeX: x,
+    homeZ: z,
+    wanderTimer: Utils.rand(1, 3),
+  };
+  
+  return p;
+}
+
+function createPeople() {
+  console.log('👥 إنشاء', QUALITY.peopleCount, 'شخص...');
+  var group = new THREE.Group();
+  
+  for (var i = 0; i < QUALITY.peopleCount; i++) {
+    var rd = Utils.pick(ROADS_DATA);
+    var off = Utils.rand(-rd.length / 2 + 40, rd.length / 2 - 40);
+    var side = Math.random() > 0.5 ? 1 : -1;
+    var so = side * (rd.width / 2 + CONFIG.sidewalkWidth / 2);
+    
+    var x = rd.x + Math.sin(rd.rotation) * off + Math.cos(rd.rotation) * so;
+    var z = rd.z + Math.cos(rd.rotation) * off - Math.sin(rd.rotation) * so;
+    
+    if (Math.abs(z) < CONFIG.canalWidth / 2 + 4) continue;
+    
+    // نوع الشخص
+    var type = Math.random() > 0.3 ? 'walker' : 'stander';
+    
+    var person = createPerson(x, z, type);
+    group.add(person);
+    people.push(person);
+  }
+  
+  scene.add(group);
+}
+
+function updatePeople(dt) {
+  for (var i = 0; i < people.length; i++) {
+    var p = people[i];
+    var ud = p.userData;
+    
+    if (ud.type === 'walker') {
+      // حركة المشي
+      ud.walkPhase += dt * 5;
+      p.position.y = Math.abs(Math.sin(ud.walkPhase)) * 0.05;
+      
+      // تغيير الاتجاه عشوائياً
+      ud.wanderTimer -= dt;
+      if (ud.wanderTimer <= 0) {
+        ud.direction += Utils.rand(-0.8, 0.8);
+        ud.wanderTimer = Utils.rand(1, 3);
+      }
+      
+      // الرجوع للمنزل إذا بعد كتير
+      var dx = ud.homeX - p.position.x;
+      var dz = ud.homeZ - p.position.z;
+      var distFromHome = Math.hypot(dx, dz);
+      if (distFromHome > 10) {
+        ud.direction = Math.atan2(dz, dx);
+      }
+      
+      // الحركة
+      p.position.x += Math.cos(ud.direction) * ud.speed * dt;
+      p.position.z += Math.sin(ud.direction) * ud.speed * dt;
+      p.rotation.y = -ud.direction + Math.PI / 2;
+      
+      // حركة الذراعين
+      if (ud.armL) ud.armL.rotation.x = Math.sin(ud.walkPhase) * 0.6;
+      if (ud.armR) ud.armR.rotation.x = -Math.sin(ud.walkPhase) * 0.6;
+    } else {
+      // واقف - حركة خفيفة
+      ud.walkPhase += dt * 2;
+      p.position.y = Math.sin(ud.walkPhase) * 0.02;
+      
+      // يلف راسه أحياناً
+      if (Math.random() > 0.99) {
+        p.rotation.y += Utils.rand(-0.5, 0.5);
+      }
+    }
+  }
+}
+
+/* ============================================================
+   🛺 التوك توك - 50+ قطعة
+   ============================================================ */
+function createTukTuk() {
+  var t = new THREE.Group();
+  t.name = 'tukTuk';
+  
+  // ===== الهيكل السفلي =====
+  var chassis = new THREE.Mesh(
+    new THREE.BoxGeometry(1.3, 0.12, 2.4),
+    MAT.black
+  );
+  chassis.position.y = 0.42;
+  t.add(chassis);
+  
+  var floorF = new THREE.Mesh(
+    new THREE.BoxGeometry(1.25, 0.08, 1.0),
+    MAT.black
+  );
+  floorF.position.set(0, 0.52, 0.65);
+  t.add(floorF);
+  
+  var floorR = new THREE.Mesh(
+    new THREE.BoxGeometry(1.25, 0.08, 1.3),
+    MAT.black
+  );
+  floorR.position.set(0, 0.52, -0.6);
+  t.add(floorR);
+  
+  // ===== المقدمة =====
+  var frontPanel = new THREE.Mesh(
+    new THREE.BoxGeometry(1.28, 0.85, 0.15),
+    MAT.yellow
+  );
+  frontPanel.position.set(0, 0.95, 1.15);
+  t.add(frontPanel);
+  
+  var frontCabin = new THREE.Mesh(
+    new THREE.BoxGeometry(1.28, 0.85, 1.0),
+    MAT.yellow
+  );
+  frontCabin.position.set(0, 0.95, 0.6);
+  t.add(frontCabin);
+  
+  // غطاء المقدمة
+  var hood = new THREE.Mesh(
+    new THREE.BoxGeometry(1.28, 0.08, 0.5),
+    MAT.yellowDark
+  );
+  hood.position.set(0, 1.4, 1.0);
+  hood.rotation.x = -0.08;
+  t.add(hood);
+  
+  // رفرف أمامي
+  var fender = new THREE.Mesh(
+    new THREE.BoxGeometry(0.5, 0.25, 1.1),
+    MAT.yellow
+  );
+  fender.position.set(0, 0.72, 1.05);
+  t.add(fender);
+  
+  // ===== الكابينة الخلفية =====
+  var rearCabin = new THREE.Mesh(
+    new THREE.BoxGeometry(1.32, 1.5, 1.4),
+    MAT.yellow
+  );
+  rearCabin.position.set(0, 1.25, -0.6);
+  t.add(rearCabin);
+  
+  // خط أسود فاصل
+  var stripe = new THREE.Mesh(
+    new THREE.BoxGeometry(1.34, 0.08, 1.42),
+    MAT.black
+  );
+  stripe.position.set(0, 1.35, -0.6);
+  t.add(stripe);
+  
+  // ===== السقف =====
+  var roof = new THREE.Mesh(
+    new THREE.BoxGeometry(1.42, 0.1, 2.5),
+    MAT.black
+  );
+  roof.position.set(0, 2.1, 0);
+  t.add(roof);
+  
+  // حافة السقف (كروم)
+  var roofTrim = new THREE.Mesh(
+    new THREE.BoxGeometry(1.44, 0.04, 2.52),
+    MAT.chrome
+  );
+  roofTrim.position.set(0, 2.04, 0);
+  t.add(roofTrim);
+  
+  // ===== أعمدة السقف =====
+  var pillarGeo = new THREE.CylinderGeometry(0.04, 0.04, 1.75, 6);
+  var pillarPos = [
+    [-0.62, 1.2, -1.2], [0.62, 1.2, -1.2],
+    [-0.62, 1.2, -0.05], [0.62, 1.2, -0.05],
+    [-0.62, 1.2, 1.05], [0.62, 1.2, 1.05],
+  ];
+  for (var i = 0; i < pillarPos.length; i++) {
+    var p = new THREE.Mesh(pillarGeo, MAT.black);
+    p.position.set(pillarPos[i][0], pillarPos[i][1], pillarPos[i][2]);
+    t.add(p);
+  }
+  
+  // ===== الزجاج =====
+  // الزجاج الأمامي
+  var windshield = new THREE.Mesh(
+    new THREE.BoxGeometry(1.2, 0.85, 0.04),
+    MAT.glassTint
+  );
+  windshield.position.set(0, 1.85, 1.1);
+  windshield.rotation.x = -0.1;
+  t.add(windshield);
+  
+  // الزجاج الجانبي الأمامي
+  for (var s = -1; s <= 1; s += 2) {
+    var sg = new THREE.Mesh(
+      new THREE.BoxGeometry(0.04, 0.8, 0.9),
+      MAT.glassTint
+    );
+    sg.position.set(s * 0.64, 1.8, 0.6);
+    t.add(sg);
+  }
+  
+  // الزجاج الجانبي الخلفي
+  for (var s = -1; s <= 1; s += 2) {
+    var rg = new THREE.Mesh(
+      new THREE.BoxGeometry(0.04, 0.95, 1.2),
+      MAT.glassTint
+    );
+    rg.position.set(s * 0.66, 1.7, -0.6);
+    t.add(rg);
+  }
+  
+  // الزجاج الخلفي
+  var rearGlass = new THREE.Mesh(
+    new THREE.BoxGeometry(1.28, 1, 0.04),
+    MAT.glassTint
+  );
+  rearGlass.position.set(0, 1.7, -1.28);
+  t.add(rearGlass);
+  
+  // ===== الشبكة الأمامية =====
+  var grillFrame = new THREE.Mesh(
+    new THREE.BoxGeometry(0.9, 0.35, 0.06),
+    MAT.chrome
+  );
+  grillFrame.position.set(0, 0.95, 1.19);
+  t.add(grillFrame);
+  
+  for (var i = 0; i < 5; i++) {
+    var slat = new THREE.Mesh(
+      new THREE.BoxGeometry(0.85, 0.04, 0.04),
+      MAT.black
+    );
+    slat.position.set(0, 0.82 + i * 0.06, 1.22);
+    t.add(slat);
+  }
+  
+  // ===== المصابيح الأمامية =====
+  var headlightGeo = new THREE.CylinderGeometry(0.12, 0.12, 0.1, 16);
+  for (var s = -1; s <= 1; s += 2) {
+    // الإطار
+    var hlFrame = new THREE.Mesh(headlightGeo, MAT.chrome);
+    hlFrame.rotation.x = Math.PI / 2;
+    hlFrame.position.set(s * 0.44, 1.15, 1.18);
+    t.add(hlFrame);
+    
+    // الزجاج
+    var hlGlass = new THREE.Mesh(headlightGeo, MAT.headlight);
+    hlGlass.rotation.x = Math.PI / 2;
+    hlGlass.position.set(s * 0.44, 1.15, 1.21);
+    t.add(hlGlass);
+  }
+  
+  // ===== الفوانيس الخلفية =====
+  var taillightGeo = new THREE.BoxGeometry(0.12, 0.22, 0.05);
+  for (var s = -1; s <= 1; s += 2) {
+    var tl = new THREE.Mesh(taillightGeo, MAT.taillight);
+    tl.position.set(s * 0.48, 0.9, -1.31);
+    t.add(tl);
+  }
+  
+  // ===== لوحة الأرقام =====
+  var plateMat = new THREE.MeshLambertMaterial({ color: 0xffffff });
+  var plate = new THREE.Mesh(
+    new THREE.BoxGeometry(0.55, 0.16, 0.03),
+    plateMat
+  );
+  plate.position.set(0, 0.68, -1.32);
+  t.add(plate);
+  
+  var frontPlate = new THREE.Mesh(
+    new THREE.BoxGeometry(0.55, 0.16, 0.03),
+    plateMat
+  );
+  frontPlate.position.set(0, 0.68, 1.22);
+  frontPlate.rotation.y = Math.PI;
+  t.add(frontPlate);
+  
+  // ===== المقود =====
+  var steerGroup = new THREE.Group();
+  
+  var steerRing = new THREE.Mesh(
+    new THREE.TorusGeometry(0.15, 0.02, 8, 20),
+    MAT.black
+  );
+  steerGroup.add(steerRing);
+  
+  for (var i = 0; i < 3; i++) {
+    var spoke = new THREE.Mesh(
+      new THREE.BoxGeometry(0.025, 0.14, 0.015),
+      MAT.black
+    );
+    spoke.rotation.z = (i / 3) * Math.PI * 2;
+    steerGroup.add(spoke);
+  }
+  
+  var hub = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.045, 0.045, 0.04, 10),
+    MAT.black
+  );
+  hub.rotation.x = Math.PI / 2;
+  steerGroup.add(hub);
+  
+  var column = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.025, 0.025, 0.35, 8),
+    MAT.black
+  );
+  column.rotation.x = -0.55;
+  column.position.set(0, -0.14, 0.12);
+  steerGroup.add(column);
+  
+  steerGroup.position.set(0, 1.5, 0.8);
+  steerGroup.rotation.x = -0.35;
+  t.add(steerGroup);
+  
+  // ===== لوحة القيادة =====
+  var dash = new THREE.Mesh(
+    new THREE.BoxGeometry(1.2, 0.2, 0.3),
+    MAT.black
+  );
+  dash.position.set(0, 1.3, 0.95);
+  t.add(dash);
+  
+  // العدادات
+  var gaugeMat = new THREE.MeshLambertMaterial({ color: 0x111111 });
+  var gaugeGeo = new THREE.CircleGeometry(0.06, 16);
+  for (var i = 0; i < 3; i++) {
+    var gauge = new THREE.Mesh(gaugeGeo, gaugeMat);
+    gauge.position.set(-0.3 + i * 0.3, 1.35, 1.11);
+    t.add(gauge);
+  }
+  
+  // ===== المرايا الجانبية =====
+  for (var s = -1; s <= 1; s += 2) {
+    var mirrorStem = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.015, 0.015, 0.25),
+      MAT.black
+    );
+    mirrorStem.rotation.z = s * Math.PI / 3;
+    mirrorStem.position.set(s * 0.75, 1.9, 1.0);
+    t.add(mirrorStem);
+    
+    var mirrorCase = new THREE.Mesh(
+      new THREE.BoxGeometry(0.14, 0.1, 0.03),
+      MAT.metalDoor
+    );
+    mirrorCase.position.set(s * 0.85, 1.95, 1.0);
+    t.add(mirrorCase);
+    
+    var mirrorGlass = new THREE.Mesh(
+      new THREE.BoxGeometry(0.11, 0.08, 0.01),
+      MAT.chrome
+    );
+    mirrorGlass.position.set(s * 0.85, 1.95, 1.02);
+    t.add(mirrorGlass);
+  }
+  
+  // ===== المقاعد =====
+  var seatMat = new THREE.MeshLambertMaterial({ color: 0x2a2a2a });
+  
+  // مقعد السائق
+  var seatDriver = new THREE.Mesh(
+    new THREE.BoxGeometry(0.55, 0.12, 0.5),
+    seatMat
+  );
+  seatDriver.position.set(0, 0.8, 0.4);
+  t.add(seatDriver);
+  
+  var backDriver = new THREE.Mesh(
+    new THREE.BoxGeometry(0.55, 0.55, 0.08),
+    seatMat
+  );
+  backDriver.position.set(0, 1.12, 0.16);
+  t.add(backDriver);
+  
+  // المقعد الخلفي
+  var rearSeat = new THREE.Mesh(
+    new THREE.BoxGeometry(1.2, 0.12, 0.55),
+    seatMat
+  );
+  rearSeat.position.set(0, 0.8, -0.75);
+  t.add(rearSeat);
+  
+  var rearBack = new THREE.Mesh(
+    new THREE.BoxGeometry(1.2, 0.65, 0.08),
+    seatMat
+  );
+  rearBack.position.set(0, 1.18, -1.05);
+  t.add(rearBack);
+  
+  // ===== العجلات (3 عجلات) =====
+  var wheels = [];
+  
+  function makeWheel(x, z, isFront) {
+    var wg = new THREE.Group();
+    wg.userData.isFront = isFront;
+    
+    // الإطار
+    var tire = new THREE.Mesh(
+      new THREE.TorusGeometry(0.26, 0.11, 12, 20),
+      MAT.carTire
+    );
+    tire.rotation.y = Math.PI / 2;
+    wg.add(tire);
+    
+    // الجنط
+    var rim = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.17, 0.17, 0.13, 12),
+      MAT.chrome
+    );
+    rim.rotation.z = Math.PI / 2;
+    wg.add(rim);
+    
+    // براغي
+    for (var i = 0; i < 5; i++) {
+      var bolt = new THREE.Mesh(
+        new THREE.SphereGeometry(0.025, 6, 6),
+        MAT.black
+      );
+      var angle = (i / 5) * Math.PI * 2;
+      bolt.position.set(0, Math.cos(angle) * 0.08, Math.sin(angle) * 0.08);
+      wg.add(bolt);
+    }
+    
+    // غطاء المركز
+    var centerCap = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.04, 0.04, 0.15, 12),
+      MAT.chrome
+    );
+    centerCap.rotation.z = Math.PI / 2;
+    wg.add(centerCap);
+    
+    wg.position.set(x, 0.26, z);
+    t.add(wg);
+    wheels.push(wg);
+    return wg;
+  }
+  
+  var frontWheel = makeWheel(0, 1.1, true);
+  makeWheel(-0.6, -0.75, false);
+  makeWheel(0.6, -0.75, false);
+  
+  // ===== إضاءة أمامية فعلية =====
+  var headlight = new THREE.SpotLight(0xfff5cc, 2.5, 30, Math.PI / 5, 0.5, 1.5);
+  headlight.position.set(0, 1.15, 1.15);
+  headlight.target.position.set(0, 0.3, 15);
+  t.add(headlight);
+  t.add(headlight.target);
+  
+  // ===== التخزين =====
+  t.userData = {
+    wheels: wheels,
+    frontWheel: frontWheel,
+    steeringWheel: steerGroup,
+    headlight: headlight,
+  };
+  
+  return t;
+}
+
+// إنشاء التوك توك
+var tukTuk = createTukTuk();
+tukTuk.position.set(0, 0, 150);
+scene.add(tukTuk);
+
+/* ============================================================
+   ⚠️ سيتم استكمال باقي الدوال في الرد الجاي
+   ============================================================ */
+
+// تحديث المراجع في كائن اللعبة
+window._GAME.tukTuk = tukTuk;
+window._GAME.cars = cars;
+window._GAME.people = people;
+window._GAME.cafes = cafes;
+window._GAME.createCafe = createCafe;
+window._GAME.createBuildings = createBuildings;
+window._GAME.createLandmarks = createLandmarks;
+window._GAME.createCafes = createCafes;
+window._GAME.createCars = createCars;
+window._GAME.createPeople = createPeople;
+window._GAME.createPerson = createPerson;
+window._GAME.createTukTuk = createTukTuk;
+window._GAME.updateCars = updateCars;
+window._GAME.updatePeople = updatePeople;
+window._GAME.isOnRoad = isOnRoad;
+window._GAME.isNearLandmark = isNearLandmark;
+
+console.log('✅ الجزء 2 من game.js جاهز - التوك توك والناس والقهاوي');
 
 })();
