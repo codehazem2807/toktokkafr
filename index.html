@@ -2,11 +2,14 @@
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, orientation=landscape">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#0a0a1e">
-<title>🛺 توك توك كفر الدوار - 3D</title>
+<meta name="screen-orientation" content="landscape">
+<meta name="x5-orientation" content="landscape">
+<title>🛺 توك توك كفر الدوار</title>
 <style>
   * {
     margin: 0;
@@ -23,23 +26,28 @@
     height: 100%;
     overflow: hidden;
     position: fixed;
+    top: 0;
+    left: 0;
     background: #000;
     font-family: 'Segoe UI', Tahoma, Arial, sans-serif;
     color: #fff;
     touch-action: none;
     overscroll-behavior: none;
+    direction: rtl;
   }
 
   #gameCanvas {
     display: block;
-    width: 100%;
-    height: 100%;
+    width: 100vw;
+    height: 100vh;
     position: fixed;
     top: 0;
     left: 0;
     touch-action: none;
+    z-index: 1;
   }
 
+  /* ============ شاشات البداية والنهاية ============ */
   .overlay {
     position: fixed;
     inset: 0;
@@ -51,7 +59,7 @@
     z-index: 1000;
     padding: 20px;
     text-align: center;
-    transition: opacity 0.5s;
+    transition: opacity 0.4s;
   }
 
   .overlay.hidden {
@@ -61,24 +69,22 @@
   }
 
   .overlay h1 {
-    font-size: clamp(28px, 8vw, 56px);
+    font-size: clamp(24px, 6vw, 48px);
     color: #ffc800;
-    text-shadow: 0 0 40px rgba(255, 200, 0, 0.6), 0 4px 0 #8a6d00;
-    margin-bottom: 15px;
+    text-shadow: 0 0 30px rgba(255, 200, 0, 0.6), 0 3px 0 #8a6d00;
+    margin-bottom: 12px;
     font-weight: 900;
-    line-height: 1.1;
   }
 
   .overlay .subtitle {
-    font-size: clamp(14px, 4vw, 20px);
+    font-size: clamp(12px, 3vw, 18px);
     color: #ffd93d;
     margin-bottom: 8px;
     letter-spacing: 2px;
-    font-weight: 600;
   }
 
   .overlay .info {
-    font-size: clamp(12px, 3.5vw, 15px);
+    font-size: clamp(11px, 2.5vw, 14px);
     color: #8899bb;
     margin-bottom: 6px;
     line-height: 1.7;
@@ -86,37 +92,31 @@
   }
 
   .overlay button {
-    margin-top: 30px;
-    padding: 18px 55px;
+    margin-top: 25px;
+    padding: 16px 50px;
     background: linear-gradient(180deg, #ffd93d 0%, #ffc800 60%, #e6a800 100%);
     border: none;
     border-radius: 50px;
-    font-size: clamp(16px, 4.5vw, 22px);
+    font-size: clamp(15px, 3.5vw, 20px);
     font-weight: 900;
     color: #000;
     cursor: pointer;
-    box-shadow: 0 8px 0 #8a6d00, 0 12px 40px rgba(255, 200, 0, 0.4);
+    box-shadow: 0 6px 0 #8a6d00, 0 10px 30px rgba(255, 200, 0, 0.4);
     transition: all 0.15s;
-    letter-spacing: 1px;
     font-family: inherit;
   }
 
   .overlay button:active {
-    transform: translateY(5px);
-    box-shadow: 0 3px 0 #8a6d00;
-  }
-
-  .overlay button:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
+    transform: translateY(4px);
+    box-shadow: 0 2px 0 #8a6d00;
   }
 
   .loading-bar {
-    width: min(320px, 80vw);
+    width: min(300px, 75vw);
     height: 8px;
     background: rgba(255, 255, 255, 0.1);
     border-radius: 4px;
-    margin-top: 30px;
+    margin-top: 25px;
     overflow: hidden;
     border: 1px solid rgba(255, 200, 0, 0.3);
   }
@@ -126,116 +126,149 @@
     background: linear-gradient(90deg, #ffc800, #ffd93d, #ffc800);
     width: 0%;
     transition: width 0.3s;
-    border-radius: 4px;
     box-shadow: 0 0 15px rgba(255, 200, 0, 0.8);
   }
 
   #loadingText {
-    font-size: 13px;
+    font-size: 12px;
     color: #ffc800;
-    margin-top: 12px;
-    letter-spacing: 1px;
+    margin-top: 10px;
   }
 
+  /* ============ HUD ============ */
   #hud {
     position: fixed;
-    top: max(12px, env(safe-area-inset-top));
-    left: 12px;
-    right: 12px;
+    inset: 0;
     display: none;
-    justify-content: space-between;
-    align-items: flex-start;
     pointer-events: none;
     z-index: 100;
-    gap: 10px;
   }
 
-  .hud-panel {
-    background: rgba(0, 0, 0, 0.7);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    border-radius: 14px;
-    padding: 10px 16px;
-    border: 1.5px solid rgba(255, 200, 0, 0.35);
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  #hud.visible {
+    display: block;
   }
 
-  .hud-stats {
+  /* لوحة الإحصائيات */
+  #statsPanel {
+    position: absolute;
+    top: max(10px, env(safe-area-inset-top));
+    right: max(10px, env(safe-area-inset-right));
+    background: rgba(0, 0, 0, 0.72);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border-radius: 12px;
+    padding: 8px 14px;
+    border: 1.5px solid rgba(255, 200, 0, 0.4);
     display: flex;
-    gap: 20px;
+    gap: 14px;
   }
 
-  .hud-item {
+  .stat-item {
     text-align: center;
-    min-width: 50px;
+    min-width: 45px;
   }
 
-  .hud-label {
-    font-size: 10px;
+  .stat-label {
+    font-size: 9px;
     color: #ffc800;
-    letter-spacing: 1px;
     font-weight: 700;
-    margin-bottom: 2px;
+    letter-spacing: 0.5px;
   }
 
-  .hud-value {
-    font-size: clamp(16px, 4vw, 22px);
+  .stat-value {
+    font-size: clamp(14px, 3.5vw, 18px);
     font-weight: 900;
     color: #fff;
     font-variant-numeric: tabular-nums;
   }
 
-  .hud-value.warning {
+  .stat-value.warning {
     color: #ff4444;
-    animation: pulse-warn 0.6s infinite;
+    animation: pulse 0.7s infinite;
   }
 
-  @keyframes pulse-warn {
+  @keyframes pulse {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.4; }
   }
 
+  /* عداد السرعة */
   #speedPanel {
+    position: absolute;
+    top: max(10px, env(safe-area-inset-top));
+    left: max(10px, env(safe-area-inset-left));
+    background: rgba(0, 0, 0, 0.72);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border-radius: 12px;
+    padding: 8px 14px;
+    border: 1.5px solid rgba(0, 255, 136, 0.5);
     text-align: center;
-    min-width: 80px;
+    min-width: 70px;
   }
 
   #speedValue {
-    font-size: clamp(20px, 5vw, 28px);
+    font-size: clamp(18px, 4.5vw, 24px);
     font-weight: 900;
     color: #00ff88;
-    text-shadow: 0 0 15px rgba(0, 255, 136, 0.7);
+    text-shadow: 0 0 10px rgba(0, 255, 136, 0.6);
+    font-variant-numeric: tabular-nums;
   }
 
   #speedUnit {
-    font-size: 10px;
+    font-size: 9px;
     color: #00ff88;
     letter-spacing: 1px;
   }
 
+  /* المهمة */
   #missionPanel {
-    position: fixed;
-    top: max(90px, calc(env(safe-area-inset-top) + 90px));
+    position: absolute;
+    top: max(10px, env(safe-area-inset-top));
     left: 50%;
     transform: translateX(-50%);
-    background: rgba(0, 0, 0, 0.75);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    padding: 10px 22px;
-    border-radius: 30px;
-    font-size: clamp(12px, 3.5vw, 15px);
+    background: rgba(0, 0, 0, 0.78);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    padding: 8px 18px;
+    border-radius: 25px;
+    font-size: clamp(11px, 2.8vw, 14px);
     border-right: 4px solid #ffc800;
-    z-index: 100;
-    white-space: nowrap;
-    max-width: 90vw;
+    max-width: 60vw;
     overflow: hidden;
     text-overflow: ellipsis;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+    white-space: nowrap;
     font-weight: 600;
     display: none;
   }
 
-  #mobileControls {
+  #missionPanel.visible {
+    display: block;
+  }
+
+  /* ============ الخريطة المصغرة ============ */
+  #minimap {
+    position: absolute;
+    bottom: max(10px, env(safe-area-inset-bottom));
+    left: max(10px, env(safe-area-inset-left));
+    width: 130px;
+    height: 130px;
+    background: rgba(0, 0, 0, 0.7);
+    border-radius: 12px;
+    border: 2px solid rgba(255, 200, 0, 0.5);
+    overflow: hidden;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+
+  #minimapCanvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+
+  /* ============ أزرار التحكم ============ */
+  #controls {
     position: fixed;
     inset: 0;
     pointer-events: none;
@@ -243,61 +276,62 @@
     display: none;
   }
 
-  #mobileControls.visible {
+  #controls.visible {
     display: block;
   }
 
-  .mobile-btn {
+  .ctrl-btn {
     position: absolute;
-    background: rgba(255, 200, 0, 0.25);
-    border: 2.5px solid rgba(255, 200, 0, 0.7);
+    pointer-events: auto;
+    touch-action: none;
+    background: rgba(255, 200, 0, 0.22);
+    border: 3px solid rgba(255, 200, 0, 0.75);
     border-radius: 50%;
     color: #ffc800;
-    font-size: 26px;
+    font-size: 28px;
     font-weight: 900;
     display: flex;
     align-items: center;
     justify-content: center;
-    pointer-events: auto;
-    touch-action: none;
     backdrop-filter: blur(6px);
     -webkit-backdrop-filter: blur(6px);
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4), inset 0 0 20px rgba(255, 200, 0, 0.2);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4), inset 0 0 20px rgba(255, 200, 0, 0.15);
     transition: transform 0.08s, background 0.08s;
-    user-select: none;
-    -webkit-user-select: none;
     font-family: inherit;
+    user-select: none;
   }
 
-  .mobile-btn:active,
-  .mobile-btn.pressed {
+  .ctrl-btn:active,
+  .ctrl-btn.pressed {
     background: rgba(255, 200, 0, 0.55);
-    transform: scale(0.92);
+    transform: scale(0.9);
   }
 
-  #btnSteerLeft {
-    bottom: max(30px, env(safe-area-inset-bottom));
-    left: 20px;
-    width: 75px;
-    height: 75px;
-    font-size: 30px;
+  /* أزرار الدوران (يسار) */
+  #btnLeft {
+    bottom: max(20px, env(safe-area-inset-bottom));
+    left: max(15px, env(safe-area-inset-left));
+    width: 80px;
+    height: 80px;
+    font-size: 32px;
   }
 
-  #btnSteerRight {
-    bottom: max(30px, env(safe-area-inset-bottom));
-    left: 110px;
-    width: 75px;
-    height: 75px;
-    font-size: 30px;
+  #btnRight {
+    bottom: max(20px, env(safe-area-inset-bottom));
+    left: calc(max(15px, env(safe-area-inset-left)) + 95px);
+    width: 80px;
+    height: 80px;
+    font-size: 32px;
   }
 
+  /* أزرار التسارع (يمين) */
   #btnAccel {
-    bottom: max(115px, calc(env(safe-area-inset-bottom) + 115px));
-    right: 25px;
-    width: 85px;
-    height: 85px;
-    font-size: 34px;
-    background: rgba(0, 255, 136, 0.25);
+    bottom: calc(max(20px, env(safe-area-inset-bottom)) + 90px);
+    right: max(15px, env(safe-area-inset-right));
+    width: 90px;
+    height: 90px;
+    font-size: 38px;
+    background: rgba(0, 255, 136, 0.22);
     border-color: rgba(0, 255, 136, 0.8);
     color: #00ff88;
   }
@@ -308,12 +342,12 @@
   }
 
   #btnBrake {
-    bottom: max(30px, env(safe-area-inset-bottom));
-    right: 25px;
-    width: 85px;
-    height: 85px;
-    font-size: 34px;
-    background: rgba(255, 60, 60, 0.25);
+    bottom: max(20px, env(safe-area-inset-bottom));
+    right: max(15px, env(safe-area-inset-right));
+    width: 90px;
+    height: 90px;
+    font-size: 38px;
+    background: rgba(255, 60, 60, 0.22);
     border-color: rgba(255, 60, 60, 0.8);
     color: #ff4444;
   }
@@ -324,71 +358,65 @@
   }
 
   #btnHandbrake {
-    bottom: max(30px, env(safe-area-inset-bottom));
-    right: 125px;
+    bottom: max(20px, env(safe-area-inset-bottom));
+    right: calc(max(15px, env(safe-area-inset-right)) + 105px);
     width: 60px;
     height: 60px;
-    font-size: 20px;
-    background: rgba(255, 140, 0, 0.25);
+    font-size: 22px;
+    background: rgba(255, 140, 0, 0.22);
     border-color: rgba(255, 140, 0, 0.8);
     color: #ff8c00;
   }
 
-  #crosshair {
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: 22px;
-    height: 22px;
-    pointer-events: none;
-    z-index: 50;
-    opacity: 0.6;
-    display: none;
-  }
-
-  #crosshair::before,
-  #crosshair::after {
-    content: '';
+  /* ============ أزرار علوية ============ */
+  .top-btn {
     position: absolute;
-    background: #fff;
-    box-shadow: 0 0 6px rgba(0, 0, 0, 0.8);
+    top: max(10px, env(safe-area-inset-top));
+    width: 42px;
+    height: 42px;
+    background: rgba(0, 0, 0, 0.7);
+    border: 1.5px solid rgba(255, 200, 0, 0.5);
+    border-radius: 10px;
+    color: #ffc800;
+    font-size: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: auto;
+    cursor: pointer;
+    backdrop-filter: blur(6px);
+    font-family: inherit;
+    z-index: 110;
   }
 
-  #crosshair::before {
-    width: 2px;
-    height: 100%;
-    left: 50%;
-    transform: translateX(-50%);
+  #pauseBtn {
+    right: 60px;
   }
 
-  #crosshair::after {
-    height: 2px;
-    width: 100%;
-    top: 50%;
-    transform: translateY(-50%);
+  #fullscreenBtn {
+    right: 10px;
   }
 
+  /* ============ Toast ============ */
   #toast {
     position: fixed;
-    top: 45%;
+    top: 40%;
     left: 50%;
-    transform: translate(-50%, -50%) scale(0.7);
+    transform: translate(-50%, -50%) scale(0.8);
     background: rgba(0, 0, 0, 0.9);
     border: 2px solid #ffc800;
     color: #ffc800;
-    padding: 15px 30px;
-    border-radius: 15px;
-    font-size: clamp(16px, 4vw, 22px);
+    padding: 12px 24px;
+    border-radius: 14px;
+    font-size: clamp(13px, 3.5vw, 18px);
     font-weight: 900;
     opacity: 0;
     pointer-events: none;
     transition: all 0.3s;
     z-index: 200;
     text-align: center;
-    white-space: nowrap;
-    box-shadow: 0 0 40px rgba(255, 200, 0, 0.5);
-    font-family: inherit;
+    box-shadow: 0 0 30px rgba(255, 200, 0, 0.5);
+    max-width: 80vw;
   }
 
   #toast.show {
@@ -396,109 +424,98 @@
     transform: translate(-50%, -50%) scale(1);
   }
 
+  /* ============ Hint ============ */
   #hint {
     position: fixed;
-    bottom: max(140px, calc(env(safe-area-inset-bottom) + 140px));
+    bottom: 50%;
     left: 50%;
     transform: translateX(-50%);
-    color: rgba(255, 255, 255, 0.85);
-    font-size: clamp(12px, 3.5vw, 14px);
-    background: rgba(0, 0, 0, 0.6);
-    padding: 8px 18px;
+    color: #fff;
+    font-size: clamp(11px, 2.5vw, 13px);
+    background: rgba(0, 0, 0, 0.7);
+    padding: 6px 16px;
     border-radius: 20px;
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(6px);
     pointer-events: none;
     z-index: 95;
     text-align: center;
-    max-width: 90vw;
     transition: opacity 0.5s;
     border: 1px solid rgba(255, 200, 0, 0.3);
+    white-space: nowrap;
   }
 
   #hint.hidden {
     opacity: 0;
   }
 
-  #pauseBtn {
-    position: fixed;
-    top: max(12px, env(safe-area-inset-top));
-    right: 12px;
-    width: 42px;
-    height: 42px;
-    background: rgba(0, 0, 0, 0.7);
-    border: 1.5px solid rgba(255, 200, 0, 0.5);
-    border-radius: 12px;
-    color: #ffc800;
-    font-size: 20px;
-    display: none;
-    align-items: center;
-    justify-content: center;
-    z-index: 110;
-    cursor: pointer;
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    font-family: inherit;
-  }
-
-  #endScreen .result-card {
+  /* ============ شاشة النهاية ============ */
+  .result-card {
     background: rgba(0, 0, 0, 0.6);
     border: 2px solid rgba(255, 200, 0, 0.5);
-    border-radius: 20px;
-    padding: 25px 40px;
-    margin: 20px 0;
-    min-width: min(340px, 85vw);
+    border-radius: 18px;
+    padding: 20px 35px;
+    margin: 15px 0;
+    min-width: min(320px, 80vw);
   }
 
-  #endScreen .result-row {
+  .result-row {
     display: flex;
     justify-content: space-between;
-    padding: 10px 0;
-    font-size: clamp(14px, 4vw, 18px);
+    padding: 8px 0;
+    font-size: clamp(13px, 3vw, 16px);
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   }
 
-  #endScreen .result-row:last-child {
+  .result-row:last-child {
     border-bottom: none;
   }
 
-  #endScreen .result-label {
+  .result-label {
     color: #8899bb;
   }
 
-  #endScreen .result-value {
+  .result-value {
     color: #ffc800;
     font-weight: 900;
   }
 
-  @media (max-width: 500px) {
-    .hud-item {
-      min-width: 40px;
-    }
-    .hud-panel {
-      padding: 8px 12px;
-    }
-    #btnSteerLeft,
-    #btnSteerRight {
-      width: 65px;
-      height: 65px;
-      font-size: 26px;
-    }
-    #btnSteerRight {
-      left: 95px;
-    }
-    #btnAccel,
-    #btnBrake {
-      width: 75px;
-      height: 75px;
-      font-size: 30px;
-    }
-    #btnHandbrake {
-      width: 52px;
-      height: 52px;
-      font-size: 18px;
-      right: 108px;
-    }
+  /* ============ شاشة الدوران ============ */
+  #rotateScreen {
+    position: fixed;
+    inset: 0;
+    background: #050518;
+    display: none;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    z-index: 2000;
+    color: #ffc800;
+    text-align: center;
+  }
+
+  #rotateScreen.visible {
+    display: flex;
+  }
+
+  #rotateScreen .icon {
+    font-size: 60px;
+    margin-bottom: 20px;
+    animation: rotate-anim 2s infinite;
+  }
+
+  @keyframes rotate-anim {
+    0%, 100% { transform: rotate(0deg); }
+    50% { transform: rotate(90deg); }
+  }
+
+  @media (max-width: 600px) {
+    #statsPanel { padding: 6px 10px; gap: 10px; }
+    .stat-item { min-width: 38px; }
+    #minimap { width: 100px; height: 100px; }
+    #btnLeft, #btnRight { width: 68px; height: 68px; font-size: 26px; }
+    #btnRight { left: calc(max(15px, env(safe-area-inset-left)) + 80px); }
+    #btnAccel, #btnBrake { width: 78px; height: 78px; font-size: 32px; }
+    #btnHandbrake { right: calc(max(15px, env(safe-area-inset-right)) + 90px); width: 52px; height: 52px; }
   }
 </style>
 </head>
@@ -506,54 +523,63 @@
 
 <canvas id="gameCanvas"></canvas>
 
+<!-- شاشة دوران الموبايل -->
+<div id="rotateScreen">
+  <div class="icon">📱</div>
+  <h1 style="font-size: 22px; margin-bottom: 10px;">لف الموبايل بالعرض</h1>
+  <p style="color: #8899bb;">اللعبة أفضل في الوضع الأفقي</p>
+</div>
+
+<!-- HUD -->
 <div id="hud">
-  <div class="hud-panel hud-stats">
-    <div class="hud-item">
-      <div class="hud-label">💰 الفلوس</div>
-      <div class="hud-value" id="moneyValue">0</div>
+  <div id="statsPanel">
+    <div class="stat-item">
+      <div class="stat-label">💰 فلوس</div>
+      <div class="stat-value" id="moneyValue">0</div>
     </div>
-    <div class="hud-item">
-      <div class="hud-label">👥 توصيلات</div>
-      <div class="hud-value" id="deliveriesValue">0</div>
+    <div class="stat-item">
+      <div class="stat-label">👥 توصيلات</div>
+      <div class="stat-value" id="deliveriesValue">0</div>
     </div>
-    <div class="hud-item">
-      <div class="hud-label">⏱️ الوقت</div>
-      <div class="hud-value" id="timeValue">03:00</div>
+    <div class="stat-item">
+      <div class="stat-label">⏱️ وقت</div>
+      <div class="stat-value" id="timeValue">05:00</div>
     </div>
   </div>
-  <div class="hud-panel" id="speedPanel">
-    <div class="hud-value" id="speedValue">0</div>
+
+  <div id="speedPanel">
+    <div id="speedValue">0</div>
     <div id="speedUnit">كم/س</div>
   </div>
+
+  <div id="missionPanel">🔍 جاري البحث عن راكب...</div>
+
+  <div id="minimap">
+    <canvas id="minimapCanvas" width="260" height="260"></canvas>
+  </div>
+
+  <button class="top-btn" id="pauseBtn">⏸️</button>
+  <button class="top-btn" id="fullscreenBtn">⛶</button>
 </div>
 
-<div id="missionPanel">🚕 جاري تحميل المدينة...</div>
-
-<div id="pauseBtn">⏸️</div>
-
-<div id="mobileControls">
-  <button class="mobile-btn" id="btnSteerLeft">◀</button>
-  <button class="mobile-btn" id="btnSteerRight">▶</button>
-  <button class="mobile-btn" id="btnAccel">▲</button>
-  <button class="mobile-btn" id="btnBrake">▼</button>
-  <button class="mobile-btn" id="btnHandbrake">🅿️</button>
+<!-- أزرار التحكم -->
+<div id="controls">
+  <button class="ctrl-btn" id="btnLeft">◀</button>
+  <button class="ctrl-btn" id="btnRight">▶</button>
+  <button class="ctrl-btn" id="btnAccel">▲</button>
+  <button class="ctrl-btn" id="btnBrake">▼</button>
+  <button class="ctrl-btn" id="btnHandbrake">🅿️</button>
 </div>
 
-<div id="crosshair"></div>
-
-<div id="hint" class="hidden">جاري التحميل...</div>
-
+<div id="hint" class="hidden"></div>
 <div id="toast"></div>
 
+<!-- شاشة البداية -->
 <div class="overlay" id="startScreen">
   <h1>🛺 توك توك كفر الدوار</h1>
   <div class="subtitle">رحلة ثلاثية الأبعاد</div>
-  <div class="info">
-    📍 الطريق الزراعي • ترعة المحمودية • شارع أحمد عرابي
-  </div>
-  <div class="info" style="color: #666; font-size: 12px; margin-top: 10px;">
-    بناءً على بيانات الوحدة المحلية لكفر الدوار
-  </div>
+  <div class="info">📍 شارع أحمد عرابي • ترعة المحمودية • محطة القطار • مسجد الثورة</div>
+  <div class="info" style="color: #666; font-size: 11px;">بناءً على بيانات الوحدة المحلية لكفر الدوار</div>
   <button id="startBtn">🚀 ابدأ الرحلة</button>
   <div class="loading-bar">
     <div class="loading-fill" id="loadingFill"></div>
@@ -561,6 +587,7 @@
   <div id="loadingText">جاري التحضير...</div>
 </div>
 
+<!-- شاشة النهاية -->
 <div class="overlay hidden" id="endScreen">
   <h1 id="endTitle">انتهت الرحلة!</h1>
   <div class="result-card">
@@ -580,10 +607,7 @@
   <button id="restartBtn">🔄 العب تاني</button>
 </div>
 
-<!-- تحميل Three.js من CDN -->
 <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
-
-<!-- كود اللعبة -->
 <script src="game.js"></script>
 
 </body>
