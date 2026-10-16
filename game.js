@@ -1,6 +1,6 @@
 /* ============================================================
-   🛺 توك توك كفر الدوار - النسخة الشعبية الاحترافية
-   منظور الشخص الثالث + محسّنة للموبايل
+   🛺 توك توك كفر الدوار - النسخة النهائية المُصلَّحة
+   حل مشاكل: الشاشة المقلوبة + الأداء + المعالم
    ============================================================ */
 
 (function() {
@@ -18,29 +18,29 @@ if (typeof THREE === 'undefined') {
    ============================================================ */
 var isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
   || (navigator.maxTouchPoints && navigator.maxTouchPoints > 2);
-var isLowEnd = isMobile && (navigator.hardwareConcurrency || 2) <= 4;
+var isLowEnd = isMobile;
 
 console.log('📱 الجهاز:', isMobile ? 'موبايل' : 'كمبيوتر');
 
 /* ============================================================
-   إعدادات الجودة
+   إعدادات الجودة - مُخفّضة جداً للموبايل
    ============================================================ */
 var QUALITY = {
-  pixelRatio: isLowEnd ? 1 : (isMobile ? 1.3 : 1.8),
-  shadows: !isLowEnd,
-  shadowMapSize: isLowEnd ? 512 : (isMobile ? 1024 : 2048),
-  fogFar: isLowEnd ? 350 : (isMobile ? 550 : 900),
-  treeCount: isLowEnd ? 25 : (isMobile ? 50 : 100),
-  buildingDensity: isLowEnd ? 0.4 : (isMobile ? 0.6 : 0.8),
-  peopleCount: isLowEnd ? 8 : (isMobile ? 15 : 30),
-  carsCount: isLowEnd ? 4 : (isMobile ? 8 : 15),
+  pixelRatio: isLowEnd ? 0.85 : 1.5,
+  shadows: false,
+  fogFar: isLowEnd ? 280 : 500,
+  treeCount: isLowEnd ? 15 : 40,
+  buildingDensity: isLowEnd ? 0.35 : 0.6,
+  peopleCount: isLowEnd ? 5 : 15,
+  carsCount: isLowEnd ? 3 : 8,
+  maxBuildings: isLowEnd ? 180 : 400,
 };
 
 /* ============================================================
-   الإعدادات العامة
+   الإعدادات
    ============================================================ */
 var CONFIG = {
-  citySize: 1500,
+  citySize: 1200,
   canalWidth: 22,
   roadWidth: 20,
   sidewalkWidth: 3,
@@ -65,36 +65,42 @@ var COLORS = {
 };
 
 /* ============================================================
-   المشهد والكاميرا
+   المشهد
    ============================================================ */
 var scene = new THREE.Scene();
 scene.background = new THREE.Color(COLORS.sky);
 scene.fog = new THREE.Fog(COLORS.sky, 80, QUALITY.fogFar);
 
+/* ============================================================
+   الكاميرا - إعداد بسيط وصحيح (مش هتتقلب)
+   ============================================================ */
 var camera = new THREE.PerspectiveCamera(
   62,
   window.innerWidth / window.innerHeight,
-  0.3,
+  0.5,
   QUALITY.fogFar + 800
 );
 
+/* ============================================================
+   المصير - إعدادات محسّنة
+   ============================================================ */
 var renderer = new THREE.WebGLRenderer({
   canvas: document.getElementById('gameCanvas'),
-  antialias: !isLowEnd,
+  antialias: false,
   powerPreference: 'high-performance',
   stencil: false,
   alpha: false,
+  depth: true,
 });
 
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, QUALITY.pixelRatio));
-renderer.shadowMap.enabled = QUALITY.shadows;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.15;
+renderer.shadowMap.enabled = false;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 
-/* حل مشكلة الشاشة المقلوبة */
+/* ============================================================
+   حل مشكلة الشاشة المقلوبة - ضبط الأبعاد
+   ============================================================ */
 function handleResize() {
   var w = window.innerWidth;
   var h = window.innerHeight;
@@ -112,29 +118,15 @@ window.addEventListener('orientationchange', function() {
 });
 
 /* ============================================================
-   الإضاءة
+   الإضاءة - بسيطة وسريعة
    ============================================================ */
-var sunLight = new THREE.DirectionalLight(0xfff5e0, 2.6);
+var sunLight = new THREE.DirectionalLight(0xfff5e0, 1.8);
 sunLight.position.set(180, 250, 120);
-sunLight.castShadow = QUALITY.shadows;
-
-if (QUALITY.shadows) {
-  sunLight.shadow.mapSize.width = QUALITY.shadowMapSize;
-  sunLight.shadow.mapSize.height = QUALITY.shadowMapSize;
-  sunLight.shadow.camera.near = 1;
-  sunLight.shadow.camera.far = 350;
-  sunLight.shadow.camera.left = -70;
-  sunLight.shadow.camera.right = 70;
-  sunLight.shadow.camera.top = 70;
-  sunLight.shadow.camera.bottom = -70;
-  sunLight.shadow.bias = -0.0005;
-  sunLight.shadow.normalBias = 0.02;
-}
 scene.add(sunLight);
 scene.add(sunLight.target);
 
-scene.add(new THREE.AmbientLight(0x8899bb, 1.0));
-scene.add(new THREE.HemisphereLight(0x87CEEB, 0x4a5a3a, 1.15));
+scene.add(new THREE.AmbientLight(0xffffff, 1.4));
+scene.add(new THREE.HemisphereLight(0x87CEEB, 0x4a5a3a, 0.9));
 
 /* ============================================================
    واجهة المستخدم
@@ -163,7 +155,6 @@ var UI = {
   endMoney: document.getElementById('endMoney'),
   endDeliveries: document.getElementById('endDeliveries'),
   endRating: document.getElementById('endRating'),
-  minimapCanvas: document.getElementById('minimapCanvas'),
   
   updateLoading: function(pct, text) {
     if (this.loadingFill) this.loadingFill.style.width = pct + '%';
@@ -218,7 +209,7 @@ var Utils = {
 };
 
 /* ============================================================
-   جمل السواق المصري الشعبي
+   جمل السواق
    ============================================================ */
 var DIALOGS = {
   pickup: [
@@ -251,180 +242,147 @@ var DIALOGS = {
 };
 
 /* ============================================================
-   المواد
+   المواد - كلها Lambert للأداء
    ============================================================ */
-function createMaterials() {
-  return {
-    road: new THREE.MeshStandardMaterial({ color: 0x2a2a2a, roughness: 0.95 }),
-    roadLine: new THREE.MeshBasicMaterial({ color: 0xffcc00 }),
-    sidewalk: new THREE.MeshStandardMaterial({ color: 0xa8a8a8, roughness: 0.85 }),
-    ground: new THREE.MeshStandardMaterial({ color: COLORS.ground, roughness: 1 }),
-    canal: new THREE.MeshStandardMaterial({ 
-      color: COLORS.canal, roughness: 0.1, metalness: 0.5, 
-      transparent: true, opacity: 0.88 
-    }),
-    
-    buildingWalls: [
-      new THREE.MeshStandardMaterial({ color: 0xd4a574, roughness: 0.85 }),
-      new THREE.MeshStandardMaterial({ color: 0xc9a878, roughness: 0.85 }),
-      new THREE.MeshStandardMaterial({ color: 0xb89878, roughness: 0.85 }),
-      new THREE.MeshStandardMaterial({ color: 0xa88868, roughness: 0.85 }),
-      new THREE.MeshStandardMaterial({ color: 0xe8c8a0, roughness: 0.85 }),
-      new THREE.MeshStandardMaterial({ color: 0xd4b890, roughness: 0.85 }),
-      new THREE.MeshStandardMaterial({ color: 0xc0a070, roughness: 0.85 }),
-      new THREE.MeshStandardMaterial({ color: 0xb08860, roughness: 0.85 }),
-    ],
-    buildingRoofs: [
-      new THREE.MeshStandardMaterial({ color: 0x8b6a4a, roughness: 0.9 }),
-      new THREE.MeshStandardMaterial({ color: 0x6a5a4a, roughness: 0.9 }),
-      new THREE.MeshStandardMaterial({ color: 0x7a6a5a, roughness: 0.9 }),
-    ],
-    
-    window: new THREE.MeshStandardMaterial({ 
-      color: 0x88ccff, emissive: 0x4477aa, emissiveIntensity: 0.35, 
-      roughness: 0.1, metalness: 0.5 
-    }),
-    windowFrame: new THREE.MeshStandardMaterial({ color: 0x3a3a3a, roughness: 0.85 }),
-    door: new THREE.MeshStandardMaterial({ color: 0x5a3a1a, roughness: 0.8 }),
-    
-    treeTrunk: new THREE.MeshStandardMaterial({ color: 0x5a3a20, roughness: 0.95 }),
-    treeLeaf: new THREE.MeshStandardMaterial({ color: 0x3a7a3a, roughness: 0.9 }),
-    treeLeafDark: new THREE.MeshStandardMaterial({ color: 0x2a5a2a, roughness: 0.9 }),
-    palmTrunk: new THREE.MeshStandardMaterial({ color: 0x8b6a3a, roughness: 0.95 }),
-    palmLeaf: new THREE.MeshStandardMaterial({ color: 0x3a8a3a, roughness: 0.85, side: THREE.DoubleSide }),
-    
-    carBody: [
-      new THREE.MeshStandardMaterial({ color: 0xcc3333, roughness: 0.3, metalness: 0.6 }),
-      new THREE.MeshStandardMaterial({ color: 0x3366cc, roughness: 0.3, metalness: 0.6 }),
-      new THREE.MeshStandardMaterial({ color: 0x33cc66, roughness: 0.3, metalness: 0.6 }),
-      new THREE.MeshStandardMaterial({ color: 0xcccccc, roughness: 0.3, metalness: 0.6 }),
-      new THREE.MeshStandardMaterial({ color: 0x333333, roughness: 0.3, metalness: 0.6 }),
-      new THREE.MeshStandardMaterial({ color: 0xf39c12, roughness: 0.3, metalness: 0.6 }),
-    ],
-    carGlass: new THREE.MeshStandardMaterial({ color: 0x88ccff, transparent: true, opacity: 0.55, roughness: 0.1 }),
-    carTire: new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.95 }),
-    
-    peopleShirt: [
-      new THREE.MeshStandardMaterial({ color: 0xe74c3c, roughness: 0.85 }),
-      new THREE.MeshStandardMaterial({ color: 0x3498db, roughness: 0.85 }),
-      new THREE.MeshStandardMaterial({ color: 0x2ecc71, roughness: 0.85 }),
-      new THREE.MeshStandardMaterial({ color: 0xf39c12, roughness: 0.85 }),
-      new THREE.MeshStandardMaterial({ color: 0x9b59b6, roughness: 0.85 }),
-      new THREE.MeshStandardMaterial({ color: 0x1abc9c, roughness: 0.85 }),
-      new THREE.MeshStandardMaterial({ color: 0xe67e22, roughness: 0.85 }),
-      new THREE.MeshStandardMaterial({ color: 0xecf0f1, roughness: 0.85 }),
-      new THREE.MeshStandardMaterial({ color: 0x2c3e50, roughness: 0.85 }),
-      new THREE.MeshStandardMaterial({ color: 0xffd700, roughness: 0.85 }),
-    ],
-    peoplePants: [
-      new THREE.MeshStandardMaterial({ color: 0x2c3e50, roughness: 0.9 }),
-      new THREE.MeshStandardMaterial({ color: 0x34495e, roughness: 0.9 }),
-      new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.9 }),
-      new THREE.MeshStandardMaterial({ color: 0x5a3a2a, roughness: 0.9 }),
-      new THREE.MeshStandardMaterial({ color: 0x4a4a4a, roughness: 0.9 }),
-    ],
-    peopleSkin: [
-      new THREE.MeshStandardMaterial({ color: 0xf5d5b0, roughness: 0.9 }),
-      new THREE.MeshStandardMaterial({ color: 0xe0b890, roughness: 0.9 }),
-      new THREE.MeshStandardMaterial({ color: 0xc89870, roughness: 0.9 }),
-      new THREE.MeshStandardMaterial({ color: 0xa87850, roughness: 0.9 }),
-      new THREE.MeshStandardMaterial({ color: 0x8d5524, roughness: 0.9 }),
-    ],
-    peopleHair: [
-      new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.95 }),
-      new THREE.MeshStandardMaterial({ color: 0x3a2a1a, roughness: 0.95 }),
-      new THREE.MeshStandardMaterial({ color: 0x5a4a3a, roughness: 0.95 }),
-      new THREE.MeshStandardMaterial({ color: 0x808080, roughness: 0.95 }),
-    ],
-    
-    mosqueWall: new THREE.MeshStandardMaterial({ color: 0xf0e8d0, roughness: 0.7 }),
-    mosqueDome: new THREE.MeshStandardMaterial({ color: 0x16a085, roughness: 0.4, metalness: 0.3 }),
-    mosqueGold: new THREE.MeshStandardMaterial({ color: 0xffcc00, roughness: 0.3, metalness: 0.8 }),
-    stationWall: new THREE.MeshStandardMaterial({ color: 0xe8dcc0, roughness: 0.75 }),
-    stationRoof: new THREE.MeshStandardMaterial({ color: 0x8b4513, roughness: 0.7 }),
-    factoryWall: new THREE.MeshStandardMaterial({ color: 0x95a5a6, roughness: 0.85 }),
-    factoryChimney: new THREE.MeshStandardMaterial({ color: 0x7f8c8d, roughness: 0.9 }),
-    hospitalWall: new THREE.MeshStandardMaterial({ color: 0xf5f5f5, roughness: 0.8 }),
-    hospitalRed: new THREE.MeshBasicMaterial({ color: 0xcc0000 }),
-    schoolWall: new THREE.MeshStandardMaterial({ color: 0xf0c880, roughness: 0.8 }),
-  };
-}
-
-var MAT = createMaterials();
+var MAT = {
+  road: new THREE.MeshLambertMaterial({ color: 0x2a2a2a }),
+  roadLine: new THREE.MeshBasicMaterial({ color: 0xffcc00 }),
+  sidewalk: new THREE.MeshLambertMaterial({ color: 0xa8a8a8 }),
+  ground: new THREE.MeshLambertMaterial({ color: COLORS.ground }),
+  canal: new THREE.MeshLambertMaterial({ color: COLORS.canal }),
+  
+  buildingWalls: [
+    new THREE.MeshLambertMaterial({ color: 0xd4a574 }),
+    new THREE.MeshLambertMaterial({ color: 0xc9a878 }),
+    new THREE.MeshLambertMaterial({ color: 0xb89878 }),
+    new THREE.MeshLambertMaterial({ color: 0xa88868 }),
+    new THREE.MeshLambertMaterial({ color: 0xe8c8a0 }),
+  ],
+  buildingRoofs: [
+    new THREE.MeshLambertMaterial({ color: 0x8b6a4a }),
+    new THREE.MeshLambertMaterial({ color: 0x6a5a4a }),
+  ],
+  
+  window: new THREE.MeshLambertMaterial({ color: 0x88ccff }),
+  door: new THREE.MeshLambertMaterial({ color: 0x5a3a1a }),
+  
+  treeTrunk: new THREE.MeshLambertMaterial({ color: 0x5a3a20 }),
+  treeLeaf: new THREE.MeshLambertMaterial({ color: 0x3a7a3a }),
+  palmTrunk: new THREE.MeshLambertMaterial({ color: 0x8b6a3a }),
+  palmLeaf: new THREE.MeshLambertMaterial({ color: 0x3a8a3a, side: THREE.DoubleSide }),
+  
+  carBody: [
+    new THREE.MeshLambertMaterial({ color: 0xcc3333 }),
+    new THREE.MeshLambertMaterial({ color: 0x3366cc }),
+    new THREE.MeshLambertMaterial({ color: 0xcccccc }),
+    new THREE.MeshLambertMaterial({ color: 0x333333 }),
+  ],
+  carTire: new THREE.MeshLambertMaterial({ color: 0x1a1a1a }),
+  
+  peopleShirt: [
+    new THREE.MeshLambertMaterial({ color: 0xe74c3c }),
+    new THREE.MeshLambertMaterial({ color: 0x3498db }),
+    new THREE.MeshLambertMaterial({ color: 0x2ecc71 }),
+    new THREE.MeshLambertMaterial({ color: 0xf39c12 }),
+    new THREE.MeshLambertMaterial({ color: 0x9b59b6 }),
+  ],
+  peoplePants: [
+    new THREE.MeshLambertMaterial({ color: 0x2c3e50 }),
+    new THREE.MeshLambertMaterial({ color: 0x1a1a1a }),
+  ],
+  peopleSkin: [
+    new THREE.MeshLambertMaterial({ color: 0xf5d5b0 }),
+    new THREE.MeshLambertMaterial({ color: 0xe0b890 }),
+    new THREE.MeshLambertMaterial({ color: 0xc89870 }),
+  ],
+  
+  mosqueWall: new THREE.MeshLambertMaterial({ color: 0xf0e8d0 }),
+  mosqueDome: new THREE.MeshLambertMaterial({ color: 0x16a085 }),
+  mosqueGold: new THREE.MeshLambertMaterial({ color: 0xffcc00 }),
+  stationWall: new THREE.MeshLambertMaterial({ color: 0xe8dcc0 }),
+  stationRoof: new THREE.MeshLambertMaterial({ color: 0x8b4513 }),
+  factoryWall: new THREE.MeshLambertMaterial({ color: 0x95a5a6 }),
+  hospitalWall: new THREE.MeshLambertMaterial({ color: 0xf5f5f5 }),
+  hospitalRed: new THREE.MeshLambertMaterial({ color: 0xcc0000 }),
+  schoolWall: new THREE.MeshLambertMaterial({ color: 0xf0c880 }),
+  
+  black: new THREE.MeshLambertMaterial({ color: 0x0a0a0a }),
+  yellow: new THREE.MeshLambertMaterial({ color: 0xffc800 }),
+  chrome: new THREE.MeshLambertMaterial({ color: 0xcccccc }),
+  glass: new THREE.MeshLambertMaterial({ 
+    color: 0xaaddff, transparent: true, opacity: 0.4 
+  }),
+  headlight: new THREE.MeshBasicMaterial({ color: 0xffffcc }),
+  taillight: new THREE.MeshBasicMaterial({ color: 0xff2222 }),
+};
 
 /* ============================================================
-   عمل Texture للنصوص (لأسماء الشوارع)
+   Texture للنصوص
    ============================================================ */
-function makeTextTexture(text, bgColor, textColor, width, height) {
-  width = width || 512;
-  height = height || 128;
-  bgColor = bgColor || '#1a5a9a';
-  textColor = textColor || '#ffffff';
-  
+function makeTextTexture(text, bgColor) {
   var canvas = document.createElement('canvas');
-  canvas.width = width;
-  canvas.height = height;
+  canvas.width = 512;
+  canvas.height = 128;
   var ctx = canvas.getContext('2d');
   
-  ctx.fillStyle = bgColor;
-  ctx.fillRect(0, 0, width, height);
+  ctx.fillStyle = bgColor || '#1a5a9a';
+  ctx.fillRect(0, 0, 512, 128);
   
   ctx.strokeStyle = '#ffffff';
   ctx.lineWidth = 6;
-  ctx.strokeRect(6, 6, width - 12, height - 12);
+  ctx.strokeRect(6, 6, 500, 116);
   
-  ctx.fillStyle = textColor;
-  ctx.font = 'bold 60px "Segoe UI", Tahoma, Arial';
+  ctx.fillStyle = '#ffffff';
+  ctx.font = 'bold 54px Tahoma, Arial';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText(text, width / 2, height / 2);
+  ctx.fillText(text, 256, 64);
   
   var tex = new THREE.CanvasTexture(canvas);
-  tex.anisotropy = 4;
   return tex;
 }
 
 /* ============================================================
-   بيانات الشوارع الحقيقية
+   الشوارع
    ============================================================ */
 var ROADS_DATA = [
-  { name: 'شارع أحمد عرابي', x: 0, z: -15, width: 20, length: 1500, rotation: 0, isMain: true, signColor: '#1a5a9a' },
-  { name: 'شارع بورسعيد', x: 0, z: 25, width: 17, length: 1500, rotation: 0, signColor: '#8b1a1a' },
-  { name: 'شارع الجيش', x: 280, z: 100, width: 17, length: 700, rotation: Math.PI / 2, signColor: '#1a8a3a' },
-  { name: 'شارع الجمهورية', x: -350, z: 0, width: 15, length: 600, rotation: Math.PI / 2, signColor: '#8a1a8a' },
-  { name: 'شارع جلال الدسوقي', x: -120, z: 400, width: 14, length: 500, rotation: Math.PI / 2, signColor: '#8a6a1a' },
-  { name: 'شارع سيدي عبد القادر', x: -550, z: 100, width: 15, length: 450, rotation: Math.PI / 2, signColor: '#1a8a8a' },
-  { name: 'شارع الحدائق', x: 100, z: 350, width: 13, length: 450, rotation: Math.PI / 2, signColor: '#3a8a1a' },
-  { name: 'شارع المحور', x: 500, z: 300, width: 13, length: 400, rotation: Math.PI / 2, signColor: '#8a3a1a' },
-  { name: 'شارع الجلاء', x: -450, z: -250, width: 14, length: 500, rotation: 0, signColor: '#1a3a8a' },
-  { name: 'شارع النصر', x: 400, z: -250, width: 14, length: 500, rotation: 0, signColor: '#8a1a1a' },
-  { name: 'شارع المحكمة', x: -250, z: -300, width: 13, length: 400, rotation: Math.PI / 2, signColor: '#5a5a5a' },
-  { name: 'شارع الموقف', x: 700, z: 0, width: 13, length: 500, rotation: Math.PI / 2, signColor: '#8a5a1a' },
+  { name: 'شارع أحمد عرابي', x: 0, z: -15, width: 20, length: 1200, rotation: 0, isMain: true },
+  { name: 'شارع بورسعيد', x: 0, z: 25, width: 17, length: 1200, rotation: 0 },
+  { name: 'شارع الجيش', x: 250, z: 100, width: 17, length: 600, rotation: Math.PI / 2 },
+  { name: 'شارع الجمهورية', x: -300, z: 0, width: 15, length: 550, rotation: Math.PI / 2 },
+  { name: 'شارع جلال الدسوقي', x: -100, z: 350, width: 14, length: 450, rotation: Math.PI / 2 },
+  { name: 'شارع سيدي عبد القادر', x: -480, z: 100, width: 15, length: 400, rotation: Math.PI / 2 },
+  { name: 'شارع الحدائق', x: 100, z: 300, width: 13, length: 400, rotation: Math.PI / 2 },
+  { name: 'شارع المحور', x: 450, z: 250, width: 13, length: 400, rotation: Math.PI / 2 },
+  { name: 'شارع الجلاء', x: -400, z: -220, width: 14, length: 450, rotation: 0 },
+  { name: 'شارع النصر', x: 350, z: -220, width: 14, length: 450, rotation: 0 },
+  { name: 'شارع المحكمة', x: -220, z: -260, width: 13, length: 350, rotation: Math.PI / 2 },
+  { name: 'شارع الموقف', x: 600, z: 0, width: 13, length: 450, rotation: Math.PI / 2 },
 ];
 
 /* ============================================================
-   الوجهات الحقيقية
+   الوجهات
    ============================================================ */
 var DESTINATIONS_DATA = [
-  { name: 'محطة قطار كفر الدوار', short: 'محطة القطار', x: -250, z: -60, color: 0x8b4513 },
-  { name: 'مسجد الثورة', short: 'المسجد', x: -120, z: 200, color: 0x16a085 },
-  { name: 'شركة مصر للغزل والنسيج', short: 'شركة الغزل', x: 400, z: -300, color: 0x95a5a6 },
-  { name: 'موقف عزيز المصري', short: 'الموقف', x: 180, z: 70, color: 0xe74c3c },
-  { name: 'مجمع الميزانة', short: 'الميزانة', x: -150, z: -80, color: 0xf39c12 },
-  { name: 'مجمع السعرانية', short: 'السعرانية', x: 400, z: 100, color: 0xe67e22 },
-  { name: 'مستشفى كفر الدوار العام', short: 'المستشفى', x: -550, z: 140, color: 0x3498db },
-  { name: 'سوق الأربعاء', short: 'السوق', x: 100, z: 180, color: 0x9b59b6 },
-  { name: 'كورنيش ترعة المحمودية', short: 'الكورنيش', x: 550, z: -20, color: 0x2980b9 },
-  { name: 'جامعة كفر الدوار', short: 'الجامعة', x: -450, z: -280, color: 0x8e44ad },
-  { name: 'مدرسة صلاح سالم', short: 'المدرسة', x: -280, z: 350, color: 0xf39c12 },
-  { name: 'شارع الجيش التجاري', short: 'الجيش', x: 300, z: 200, color: 0xe74c3c },
+  { name: 'محطة قطار كفر الدوار', x: -220, z: -60, color: 0x8b4513 },
+  { name: 'مسجد الثورة', x: -100, z: 180, color: 0x16a085 },
+  { name: 'شركة مصر للغزل والنسيج', x: 350, z: -260, color: 0x95a5a6 },
+  { name: 'موقف عزيز المصري', x: 160, z: 60, color: 0xe74c3c },
+  { name: 'مجمع الميزانة', x: -130, z: -70, color: 0xf39c12 },
+  { name: 'مجمع السعرانية', x: 350, z: 90, color: 0xe67e22 },
+  { name: 'مستشفى كفر الدوار العام', x: -480, z: 130, color: 0x3498db },
+  { name: 'سوق الأربعاء', x: 90, z: 160, color: 0x9b59b6 },
+  { name: 'كورنيش ترعة المحمودية', x: 480, z: -18, color: 0x2980b9 },
+  { name: 'جامعة كفر الدوار', x: -400, z: -250, color: 0x8e44ad },
+  { name: 'مدرسة صلاح سالم', x: -240, z: 300, color: 0xf39c12 },
+  { name: 'شارع الجيش التجاري', x: 270, z: 180, color: 0xe74c3c },
 ];
 
 /* ============================================================
    نظام الأصوات
    ============================================================ */
 var AudioSystem = {
-  ctx: null, engineOsc: null, engineGain: null, engineFilter: null,
+  ctx: null, engineOsc: null, engineGain: null,
   enabled: true, initialized: false,
   
   init: function() {
@@ -446,13 +404,9 @@ var AudioSystem = {
       this.engineOsc = this.ctx.createOscillator();
       this.engineOsc.type = 'sawtooth';
       this.engineOsc.frequency.value = 55;
-      this.engineFilter = this.ctx.createBiquadFilter();
-      this.engineFilter.type = 'lowpass';
-      this.engineFilter.frequency.value = 350;
       this.engineGain = this.ctx.createGain();
-      this.engineGain.gain.value = 0.025;
-      this.engineOsc.connect(this.engineFilter);
-      this.engineFilter.connect(this.engineGain);
+      this.engineGain.gain.value = 0.02;
+      this.engineOsc.connect(this.engineGain);
       this.engineGain.connect(this.ctx.destination);
       this.engineOsc.start();
     } catch (e) {}
@@ -461,7 +415,7 @@ var AudioSystem = {
   stopEngine: function() {
     if (this.engineOsc) {
       try { this.engineOsc.stop(); } catch (e) {}
-      this.engineOsc = null; this.engineGain = null; this.engineFilter = null;
+      this.engineOsc = null; this.engineGain = null;
     }
   },
   
@@ -473,20 +427,20 @@ var AudioSystem = {
   updateEngine: function(speed, maxSpeed, isAcc) {
     if (!this.engineOsc || !this.engineGain || !this.ctx) return;
     var r = Math.min(Math.abs(speed) / maxSpeed, 1);
-    this.engineOsc.frequency.setTargetAtTime(55 + r * 125, this.ctx.currentTime, 0.1);
-    this.engineGain.gain.setTargetAtTime(0.02 + r * 0.07 + (isAcc ? 0.02 : 0), this.ctx.currentTime, 0.15);
+    this.engineOsc.frequency.setTargetAtTime(55 + r * 100, this.ctx.currentTime, 0.1);
+    this.engineGain.gain.setTargetAtTime(0.015 + r * 0.05 + (isAcc ? 0.015 : 0), this.ctx.currentTime, 0.15);
   },
   
   playPickup: function() { 
-    if (this.enabled && this.ctx) this._tone(700, 1000, 0.2, 0.12); 
+    if (this.enabled && this.ctx) this._tone(700, 1000, 0.2, 0.1); 
   },
   
   playDelivery: function() {
     if (!this.enabled || !this.ctx) return;
     var s = this;
-    this._tone(523, 523, 0.1, 0.12);
-    setTimeout(function() { s._tone(659, 659, 0.1, 0.12); }, 100);
-    setTimeout(function() { s._tone(784, 784, 0.2, 0.12); }, 200);
+    this._tone(523, 523, 0.1, 0.1);
+    setTimeout(function() { s._tone(659, 659, 0.1, 0.1); }, 100);
+    setTimeout(function() { s._tone(784, 784, 0.2, 0.1); }, 200);
   },
   
   _tone: function(f1, f2, dur, vol) {
@@ -505,12 +459,12 @@ var AudioSystem = {
 };
 
 /* ============================================================
-   بناء الأرضية
+   الأرضية
    ============================================================ */
 function createGround() {
-  var ground = new THREE.Mesh(new THREE.PlaneGeometry(5000, 5000), MAT.ground);
+  var ground = new THREE.Mesh(new THREE.PlaneGeometry(4000, 4000), MAT.ground);
   ground.rotation.x = -Math.PI / 2;
-  ground.receiveShadow = QUALITY.shadows;
+  ground.position.y = -0.05;
   scene.add(ground);
 }
 
@@ -521,54 +475,37 @@ var canalRef = null;
 function createCanal() {
   var group = new THREE.Group();
   
-  var waterGeo = new THREE.PlaneGeometry(CONFIG.citySize * 1.4, CONFIG.canalWidth, 20, 3);
-  var water = new THREE.Mesh(waterGeo, MAT.canal);
+  var water = new THREE.Mesh(
+    new THREE.PlaneGeometry(CONFIG.citySize * 1.4, CONFIG.canalWidth),
+    MAT.canal
+  );
   water.rotation.x = -Math.PI / 2;
-  water.position.y = -0.4;
-  water.receiveShadow = QUALITY.shadows;
+  water.position.y = -0.35;
   group.add(water);
-  group.userData.water = water;
-  group.userData.basePositions = waterGeo.attributes.position.array.slice();
   
-  var bankMat = new THREE.MeshStandardMaterial({ color: 0x8b7355, roughness: 0.95 });
   for (var s = -1; s <= 1; s += 2) {
-    var bank = new THREE.Mesh(new THREE.BoxGeometry(CONFIG.citySize * 1.4, 2, 3), bankMat);
-    bank.position.set(0, 0.8, s * (CONFIG.canalWidth / 2 + 1.5));
-    if (QUALITY.shadows) { bank.castShadow = true; bank.receiveShadow = true; }
+    var bank = new THREE.Mesh(
+      new THREE.BoxGeometry(CONFIG.citySize * 1.4, 1.5, 3),
+      new THREE.MeshLambertMaterial({ color: 0x8b7355 })
+    );
+    bank.position.set(0, 0.6, s * (CONFIG.canalWidth / 2 + 1.5));
     group.add(bank);
-    
-    var railMat = new THREE.MeshStandardMaterial({ color: 0xdddddd, roughness: 0.5, metalness: 0.4 });
-    var rail = new THREE.Mesh(new THREE.BoxGeometry(CONFIG.citySize * 1.4, 0.8, 0.15), railMat);
-    rail.position.set(0, 2.2, s * (CONFIG.canalWidth / 2 + 3.2));
-    if (QUALITY.shadows) rail.castShadow = true;
-    group.add(rail);
   }
   
   // الجسر
   var bridge = new THREE.Mesh(
-    new THREE.BoxGeometry(26, 2.5, CONFIG.canalWidth + 16),
-    new THREE.MeshStandardMaterial({ color: 0x555555, roughness: 0.9 })
+    new THREE.BoxGeometry(24, 2, CONFIG.canalWidth + 14),
+    new THREE.MeshLambertMaterial({ color: 0x555555 })
   );
-  bridge.position.set(0, 1.5, 0);
-  if (QUALITY.shadows) { bridge.castShadow = true; bridge.receiveShadow = true; }
+  bridge.position.set(0, 1.2, 0);
   group.add(bridge);
-  
-  for (var s = -1; s <= 1; s += 2) {
-    var brail = new THREE.Mesh(
-      new THREE.BoxGeometry(1.5, 1, CONFIG.canalWidth + 16),
-      new THREE.MeshStandardMaterial({ color: 0xdddddd, roughness: 0.5, metalness: 0.4 })
-    );
-    brail.position.set(s * 12, 3.2, 0);
-    if (QUALITY.shadows) brail.castShadow = true;
-    group.add(brail);
-  }
   
   scene.add(group);
   canalRef = group;
 }
 
 /* ============================================================
-   الشوارع مع لافتات الأسماء
+   الشوارع + لافتات الأسماء
    ============================================================ */
 function createRoads() {
   var group = new THREE.Group();
@@ -576,37 +513,35 @@ function createRoads() {
   for (var i = 0; i < ROADS_DATA.length; i++) {
     var rd = ROADS_DATA[i];
     
-    // جسم الشارع
+    // الشارع
     var road = new THREE.Mesh(new THREE.BoxGeometry(rd.width, 0.15, rd.length), MAT.road);
-    road.position.set(rd.x, 0.08, rd.z);
+    road.position.set(rd.x, 0.05, rd.z);
     road.rotation.y = rd.rotation;
-    road.receiveShadow = QUALITY.shadows;
     group.add(road);
     
-    // أرصفة
+    // الأرصفة
     for (var s = -1; s <= 1; s += 2) {
       var sidewalk = new THREE.Mesh(
-        new THREE.BoxGeometry(CONFIG.sidewalkWidth, 0.35, rd.length),
+        new THREE.BoxGeometry(CONFIG.sidewalkWidth, 0.3, rd.length),
         MAT.sidewalk
       );
       var so = s * (rd.width / 2 + CONFIG.sidewalkWidth / 2);
       var dx = Math.cos(rd.rotation) * so;
       var dz = -Math.sin(rd.rotation) * so;
-      sidewalk.position.set(rd.x + dx, 0.25, rd.z + dz);
+      sidewalk.position.set(rd.x + dx, 0.15, rd.z + dz);
       sidewalk.rotation.y = rd.rotation;
-      sidewalk.receiveShadow = QUALITY.shadows;
       group.add(sidewalk);
     }
     
     // خطوط الطريق
     if (rd.width >= 15) {
-      var mc = Math.floor(rd.length / 25);
+      var mc = Math.floor(rd.length / 30);
       for (var j = 0; j < mc; j++) {
-        var off = -rd.length / 2 + j * 25 + 12.5;
-        var mark = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.05, 7), MAT.roadLine);
+        var off = -rd.length / 2 + j * 30 + 15;
+        var mark = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.05, 8), MAT.roadLine);
         var mx = rd.x + Math.sin(rd.rotation) * off;
         var mz = rd.z + Math.cos(rd.rotation) * off;
-        mark.position.set(mx, 0.18, mz);
+        mark.position.set(mx, 0.15, mz);
         mark.rotation.y = rd.rotation;
         group.add(mark);
       }
@@ -614,22 +549,30 @@ function createRoads() {
     
     // لوحة اسم الشارع
     if (rd.isMain || rd.width >= 15) {
-      var signTex = makeTextTexture(rd.name, rd.signColor || '#1a5a9a', '#ffffff', 700, 140);
+      var signTex = makeTextTexture(rd.name, '#1a5a9a');
       var signMat = new THREE.MeshBasicMaterial({ map: signTex, side: THREE.DoubleSide });
-      var signGeo = new THREE.PlaneGeometry(7, 1.4);
-      var sign = new THREE.Mesh(signGeo, signMat);
+      var sign = new THREE.Mesh(new THREE.PlaneGeometry(8, 2), signMat);
       
-      var signX = rd.x + Math.cos(rd.rotation) * (rd.width / 2 + 1);
-      var signZ = rd.z - Math.sin(rd.rotation) * (rd.width / 2 + 1);
-      var signY = 5.5;
+      // موقع اللوحة على يمين الشارع
+      var signOffset = rd.width / 2 + 1.5;
+      var signX = rd.x + Math.cos(rd.rotation) * signOffset;
+      var signZ = rd.z - Math.sin(rd.rotation) * signOffset;
       
-      var poleMat = new THREE.MeshStandardMaterial({ color: 0xcccccc, roughness: 0.5, metalness: 0.5 });
-      var pole = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 6), poleMat);
+      // اختيار موضع على طول الشارع
+      var signPosOffset = rd.length / 4;
+      signX += Math.sin(rd.rotation) * signPosOffset;
+      signZ += Math.cos(rd.rotation) * signPosOffset;
+      
+      // العمود
+      var pole = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.08, 0.08, 6),
+        MAT.chrome
+      );
       pole.position.set(signX, 3, signZ);
-      if (QUALITY.shadows) pole.castShadow = true;
       group.add(pole);
       
-      sign.position.set(signX, signY, signZ);
+      // اللوحة
+      sign.position.set(signX, 5.8, signZ);
       sign.rotation.y = 0;
       group.add(sign);
     }
@@ -643,21 +586,13 @@ function createRoads() {
    ============================================================ */
 function createRailway() {
   var group = new THREE.Group();
-  var railX = -280;
-  var railMat = new THREE.MeshStandardMaterial({ color: 0x808080, roughness: 0.4, metalness: 0.8 });
+  var railX = -250;
+  var railMat = new THREE.MeshLambertMaterial({ color: 0x808080 });
   
   for (var s = -1; s <= 1; s += 2) {
     var rail = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.3, CONFIG.citySize), railMat);
-    rail.position.set(railX + s * 1.2, 0.4, 0);
-    if (QUALITY.shadows) rail.castShadow = true;
+    rail.position.set(railX + s * 1.2, 0.35, 0);
     group.add(rail);
-  }
-  
-  var sleeperMat = new THREE.MeshStandardMaterial({ color: 0x4a3a2a, roughness: 1 });
-  for (var z = -CONFIG.citySize / 2; z < CONFIG.citySize / 2; z += 4) {
-    var sl = new THREE.Mesh(new THREE.BoxGeometry(3.5, 0.15, 0.3), sleeperMat);
-    sl.position.set(railX, 0.28, z);
-    group.add(sl);
   }
   
   scene.add(group);
@@ -671,26 +606,15 @@ function createTree(x, z, scale) {
   var t = new THREE.Group();
   
   var trunk = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.15 * scale, 0.22 * scale, 2.2 * scale, 6),
+    new THREE.CylinderGeometry(0.15 * scale, 0.22 * scale, 2.2 * scale, 5),
     MAT.treeTrunk
   );
   trunk.position.y = 1.1 * scale;
-  if (QUALITY.shadows) trunk.castShadow = true;
   t.add(trunk);
   
-  var leafMat = Math.random() > 0.5 ? MAT.treeLeaf : MAT.treeLeafDark;
-  var l1 = new THREE.Mesh(new THREE.SphereGeometry(1.3 * scale, 7, 6), leafMat);
-  l1.position.y = 2.9 * scale;
-  if (QUALITY.shadows) l1.castShadow = true;
-  t.add(l1);
-  
-  var l2 = new THREE.Mesh(new THREE.SphereGeometry(0.9 * scale, 6, 5), leafMat);
-  l2.position.set(0.5 * scale, 3.4 * scale, 0.3 * scale);
-  t.add(l2);
-  
-  var l3 = new THREE.Mesh(new THREE.SphereGeometry(0.85 * scale, 6, 5), leafMat);
-  l3.position.set(-0.4 * scale, 3.3 * scale, -0.3 * scale);
-  t.add(l3);
+  var leaf = new THREE.Mesh(new THREE.SphereGeometry(1.3 * scale, 6, 5), MAT.treeLeaf);
+  leaf.position.y = 2.9 * scale;
+  t.add(leaf);
   
   t.position.set(x, 0, z);
   return t;
@@ -701,17 +625,16 @@ function createPalm(x, z, scale) {
   var p = new THREE.Group();
   
   var trunk = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.14 * scale, 0.2 * scale, 5.5 * scale, 7),
+    new THREE.CylinderGeometry(0.14 * scale, 0.2 * scale, 5.5 * scale, 6),
     MAT.palmTrunk
   );
   trunk.position.y = 2.75 * scale;
-  if (QUALITY.shadows) trunk.castShadow = true;
   p.add(trunk);
   
-  for (var i = 0; i < 7; i++) {
-    var angle = (i / 7) * Math.PI * 2;
+  for (var i = 0; i < 6; i++) {
+    var angle = (i / 6) * Math.PI * 2;
     var leaf = new THREE.Mesh(
-      new THREE.PlaneGeometry(0.85 * scale, 3.2 * scale),
+      new THREE.PlaneGeometry(0.85 * scale, 3 * scale),
       MAT.palmLeaf
     );
     leaf.position.set(
@@ -731,13 +654,13 @@ function createPalm(x, z, scale) {
 function createFoliage() {
   var group = new THREE.Group();
   
-  var step = isLowEnd ? 50 : 30;
+  var step = 40;
   for (var x = -CONFIG.citySize * 0.55; x < CONFIG.citySize * 0.55; x += step) {
-    if (Math.random() > 0.4) {
-      group.add(createPalm(x + Utils.rand(-4, 4), -(CONFIG.canalWidth / 2 + 5), Utils.rand(0.85, 1.15)));
+    if (Math.random() > 0.5) {
+      group.add(createPalm(x + Utils.rand(-4, 4), -(CONFIG.canalWidth / 2 + 5), Utils.rand(0.9, 1.1)));
     }
-    if (Math.random() > 0.4) {
-      group.add(createPalm(x + Utils.rand(-4, 4), (CONFIG.canalWidth / 2 + 5), Utils.rand(0.85, 1.15)));
+    if (Math.random() > 0.5) {
+      group.add(createPalm(x + Utils.rand(-4, 4), (CONFIG.canalWidth / 2 + 5), Utils.rand(0.9, 1.1)));
     }
   }
   
@@ -745,9 +668,9 @@ function createFoliage() {
   for (var i = 0; i < ROADS_DATA.length && count < QUALITY.treeCount; i++) {
     var rd = ROADS_DATA[i];
     if (rd.width < 13) continue;
-    var trees = Math.floor(rd.length / 55);
+    var trees = Math.floor(rd.length / 70);
     for (var j = 0; j < trees && count < QUALITY.treeCount; j++) {
-      var off = -rd.length / 2 + j * 55 + 27;
+      var off = -rd.length / 2 + j * 70 + 35;
       var s = Math.random() > 0.5 ? 1 : -1;
       var so = s * (rd.width / 2 + CONFIG.sidewalkWidth + 1.5);
       var tx = rd.x + Math.sin(rd.rotation) * off + Math.cos(rd.rotation) * so;
@@ -763,7 +686,7 @@ function createFoliage() {
 }
 
 /* ============================================================
-   المباني الواقعية
+   المباني - InstancedMesh للأداء
    ============================================================ */
 function isOnRoad(x, z, pad) {
   pad = pad || 0;
@@ -779,81 +702,11 @@ function isOnRoad(x, z, pad) {
   return false;
 }
 
-function isNearLandmark(x, z) {
-  for (var i = 0; i < DESTINATIONS_DATA.length; i++) {
-    var d = DESTINATIONS_DATA[i];
-    if (Math.abs(x - d.x) < 32 && Math.abs(z - d.z) < 32) return true;
-  }
-  return false;
-}
-
-function createDetailedBuilding(x, z, w, d, h) {
-  var group = new THREE.Group();
-  
-  var wallMat = Utils.pick(MAT.buildingWalls);
-  var roofMat = Utils.pick(MAT.buildingRoofs);
-  
-  // المبنى الرئيسي
-  var building = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), wallMat);
-  building.position.y = h / 2;
-  if (QUALITY.shadows) {
-    building.castShadow = true;
-    building.receiveShadow = true;
-  }
-  group.add(building);
-  
-  // سقف
-  var roof = new THREE.Mesh(new THREE.BoxGeometry(w + 0.4, 0.3, d + 0.4), roofMat);
-  roof.position.y = h + 0.15;
-  if (QUALITY.shadows) roof.castShadow = true;
-  group.add(roof);
-  
-  // نوافذ
-  if (!isLowEnd) {
-    var floors = Math.max(1, Math.floor(h / 3));
-    var winCols = Math.max(1, Math.floor(w / 3));
-    
-    for (var f = 0; f < floors; f++) {
-      for (var c = 0; c < winCols; c++) {
-        var winX = -w / 2 + 1.5 + c * (w / winCols);
-        var winY = 1.5 + f * 3;
-        
-        // نافذة أمامية
-        var frame1 = new THREE.Mesh(new THREE.BoxGeometry(1.4, 1.7, 0.15), MAT.windowFrame);
-        frame1.position.set(winX, winY, d / 2 + 0.05);
-        group.add(frame1);
-        
-        var glass1 = new THREE.Mesh(new THREE.BoxGeometry(1.1, 1.4, 0.05), MAT.window);
-        glass1.position.set(winX, winY, d / 2 + 0.12);
-        group.add(glass1);
-        
-        // نافذة خلفية
-        var frame2 = new THREE.Mesh(new THREE.BoxGeometry(1.4, 1.7, 0.15), MAT.windowFrame);
-        frame2.position.set(winX, winY, -d / 2 - 0.05);
-        group.add(frame2);
-      }
-    }
-  }
-  
-  // باب المدخل
-  var door = new THREE.Mesh(new THREE.BoxGeometry(1.6, 2.6, 0.15), MAT.door);
-  door.position.set(0, 1.3, d / 2 + 0.08);
-  group.add(door);
-  
-  // مظلة فوق الباب
-  var awning = new THREE.Mesh(new THREE.BoxGeometry(2.5, 0.1, 1.2), roofMat);
-  awning.position.set(0, 2.8, d / 2 + 0.5);
-  awning.rotation.x = -0.2;
-  group.add(awning);
-  
-  group.position.set(x, 0, z);
-  return group;
-}
-
 function createBuildings() {
   var group = new THREE.Group();
   var grid = 40;
   var half = CONFIG.citySize / 2;
+  var buildingList = [];
   
   for (var gx = -half; gx < half; gx += grid) {
     for (var gz = -half; gz < half; gz += grid) {
@@ -862,54 +715,120 @@ function createBuildings() {
       
       if (isOnRoad(x, z, 4)) continue;
       if (Math.abs(z) < CONFIG.canalWidth / 2 + 8) continue;
-      if (Math.abs(x + 280) < 15) continue;
+      if (Math.abs(x + 250) < 15) continue;
       if (Math.abs(x) < 18 && Math.abs(z) < 20) continue;
-      if (isNearLandmark(x, z)) continue;
+      
+      // تخطي أماكن المعالم
+      var isNearLandmark = false;
+      for (var k = 0; k < DESTINATIONS_DATA.length; k++) {
+        var d = DESTINATIONS_DATA[k];
+        if (Math.abs(x - d.x) < 40 && Math.abs(z - d.z) < 40) {
+          isNearLandmark = true;
+          break;
+        }
+      }
+      if (isNearLandmark) continue;
+      
       if (Math.random() > QUALITY.buildingDensity) continue;
+      if (buildingList.length >= QUALITY.maxBuildings) break;
       
-      var w = Utils.rand(10, 18);
-      var d = Utils.rand(10, 18);
-      var h = Utils.rand(6, 22);
+      var w = Utils.rand(10, 16);
+      var d2 = Utils.rand(10, 16);
+      var h = Utils.rand(6, 18);
       
-      group.add(createDetailedBuilding(x, z, w, d, h));
+      buildingList.push({ x: x, z: z, w: w, d: d2, h: h });
     }
+  }
+  
+  // استخدام InstancedMesh لكل لون
+  var boxGeo = new THREE.BoxGeometry(1, 1, 1);
+  
+  for (var c = 0; c < MAT.buildingWalls.length; c++) {
+    var filtered = [];
+    for (var i = 0; i < buildingList.length; i++) {
+      if (i % MAT.buildingWalls.length === c) {
+        filtered.push(buildingList[i]);
+      }
+    }
+    
+    if (filtered.length === 0) continue;
+    
+    var instMesh = new THREE.InstancedMesh(boxGeo, MAT.buildingWalls[c], filtered.length);
+    var matrix = new THREE.Matrix4();
+    
+    for (var i = 0; i < filtered.length; i++) {
+      var b = filtered[i];
+      matrix.makeScale(b.w, b.h, b.d);
+      matrix.setPosition(b.x, b.h / 2, b.z);
+      instMesh.setMatrixAt(i, matrix);
+    }
+    
+    instMesh.instanceMatrix.needsUpdate = true;
+    group.add(instMesh);
+  }
+  
+  // أسطح المباني
+  var roofGeo = new THREE.BoxGeometry(1, 0.3, 1);
+  for (var c = 0; c < MAT.buildingRoofs.length; c++) {
+    var filteredR = [];
+    for (var i = 0; i < buildingList.length; i++) {
+      if (i % MAT.buildingRoofs.length === c) {
+        filteredR.push(buildingList[i]);
+      }
+    }
+    
+    if (filteredR.length === 0) continue;
+    
+    var roofMesh = new THREE.InstancedMesh(roofGeo, MAT.buildingRoofs[c], filteredR.length);
+    var matrix = new THREE.Matrix4();
+    
+    for (var i = 0; i < filteredR.length; i++) {
+      var b = filteredR[i];
+      matrix.makeScale(b.w + 0.4, 1, b.d + 0.4);
+      matrix.setPosition(b.x, b.h + 0.15, b.z);
+      roofMesh.setMatrixAt(i, matrix);
+    }
+    
+    roofMesh.instanceMatrix.needsUpdate = true;
+    group.add(roofMesh);
   }
   
   scene.add(group);
 }
 
 /* ============================================================
-   المعالم الحقيقية
+   المعالم الحقيقية - بتتبني في المكان الصح
    ============================================================ */
 function createMosque(x, z) {
   var g = new THREE.Group();
   
-  var base = new THREE.Mesh(new THREE.BoxGeometry(20, 10, 20), MAT.mosqueWall);
-  base.position.y = 5;
-  if (QUALITY.shadows) base.castShadow = true;
+  var base = new THREE.Mesh(new THREE.BoxGeometry(18, 9, 18), MAT.mosqueWall);
+  base.position.y = 4.5;
   g.add(base);
   
   var dome = new THREE.Mesh(
-    new THREE.SphereGeometry(6, 20, 14, 0, Math.PI * 2, 0, Math.PI / 2),
+    new THREE.SphereGeometry(5.5, 16, 12, 0, Math.PI * 2, 0, Math.PI / 2),
     MAT.mosqueDome
   );
-  dome.position.y = 10;
-  if (QUALITY.shadows) dome.castShadow = true;
+  dome.position.y = 9;
   g.add(dome);
   
-  var finial = new THREE.Mesh(new THREE.ConeGeometry(0.8, 3, 8), MAT.mosqueGold);
-  finial.position.y = 17;
+  var finial = new THREE.Mesh(new THREE.ConeGeometry(0.7, 2.5, 6), MAT.mosqueGold);
+  finial.position.y = 15;
   g.add(finial);
   
   for (var s = -1; s <= 1; s += 2) {
-    var minaret = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 22, 10), MAT.mosqueWall);
-    minaret.position.set(s * 11, 11, 0);
-    if (QUALITY.shadows) minaret.castShadow = true;
+    var minaret = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 0.9, 20, 8), MAT.mosqueWall);
+    minaret.position.set(s * 10, 10, 0);
     g.add(minaret);
     
-    var mTop = new THREE.Mesh(new THREE.ConeGeometry(1.5, 4, 10), MAT.mosqueDome);
-    mTop.position.set(s * 11, 24, 0);
+    var mTop = new THREE.Mesh(new THREE.ConeGeometry(1.3, 3.5, 8), MAT.mosqueDome);
+    mTop.position.set(s * 10, 22, 0);
     g.add(mTop);
+    
+    var mGold = new THREE.Mesh(new THREE.ConeGeometry(0.4, 1.5, 6), MAT.mosqueGold);
+    mGold.position.set(s * 10, 24.5, 0);
+    g.add(mGold);
   }
   
   g.position.set(x, 0, z);
@@ -919,30 +838,27 @@ function createMosque(x, z) {
 function createStation(x, z) {
   var g = new THREE.Group();
   
-  var main = new THREE.Mesh(new THREE.BoxGeometry(32, 9, 14), MAT.stationWall);
-  main.position.y = 4.5;
-  if (QUALITY.shadows) main.castShadow = true;
+  var main = new THREE.Mesh(new THREE.BoxGeometry(30, 8, 14), MAT.stationWall);
+  main.position.y = 4;
   g.add(main);
   
-  var roof = new THREE.Mesh(new THREE.BoxGeometry(34, 0.8, 16), MAT.stationRoof);
-  roof.position.y = 9.4;
+  var roof = new THREE.Mesh(new THREE.BoxGeometry(32, 0.8, 16), MAT.stationRoof);
+  roof.position.y = 8.4;
   g.add(roof);
   
-  var tower = new THREE.Mesh(new THREE.BoxGeometry(5, 16, 5), MAT.stationWall);
-  tower.position.set(11, 12, 0);
+  var tower = new THREE.Mesh(new THREE.BoxGeometry(4.5, 14, 4.5), MAT.stationWall);
+  tower.position.set(10, 11, 0);
   g.add(tower);
   
-  var towerRoof = new THREE.Mesh(new THREE.ConeGeometry(3.5, 4, 4), MAT.stationRoof);
-  towerRoof.position.set(11, 22, 0);
+  var towerRoof = new THREE.Mesh(new THREE.ConeGeometry(3.2, 4, 4), MAT.stationRoof);
+  towerRoof.position.set(10, 20, 0);
   towerRoof.rotation.y = Math.PI / 4;
   g.add(towerRoof);
   
-  var clockFace = new THREE.Mesh(
-    new THREE.CircleGeometry(1.8, 24),
-    new THREE.MeshBasicMaterial({ color: 0xffffff })
-  );
-  clockFace.position.set(11, 16, 2.55);
-  g.add(clockFace);
+  var clock = new THREE.Mesh(new THREE.CircleGeometry(1.6, 20), 
+    new THREE.MeshBasicMaterial({ color: 0xffffff }));
+  clock.position.set(10, 14, 2.4);
+  g.add(clock);
   
   g.position.set(x, 0, z);
   return g;
@@ -951,19 +867,24 @@ function createStation(x, z) {
 function createFactory(x, z) {
   var g = new THREE.Group();
   
-  var main = new THREE.Mesh(new THREE.BoxGeometry(48, 16, 36), MAT.factoryWall);
-  main.position.y = 8;
-  if (QUALITY.shadows) main.castShadow = true;
+  var main = new THREE.Mesh(new THREE.BoxGeometry(42, 14, 32), MAT.factoryWall);
+  main.position.y = 7;
   g.add(main);
   
   for (var i = 0; i < 3; i++) {
     var chimney = new THREE.Mesh(
-      new THREE.CylinderGeometry(1.8, 2.2, 32, 12),
-      MAT.factoryChimney
+      new THREE.CylinderGeometry(1.6, 2, 28, 10),
+      new THREE.MeshLambertMaterial({ color: 0x7f8c8d })
     );
-    chimney.position.set(-15 + i * 15, 24, -14);
-    if (QUALITY.shadows) chimney.castShadow = true;
+    chimney.position.set(-12 + i * 12, 21, -12);
     g.add(chimney);
+    
+    var band = new THREE.Mesh(
+      new THREE.CylinderGeometry(1.7, 1.7, 1.2),
+      new THREE.MeshLambertMaterial({ color: 0xcc0000 })
+    );
+    band.position.set(-12 + i * 12, 30, -12);
+    g.add(band);
   }
   
   g.position.set(x, 0, z);
@@ -973,24 +894,23 @@ function createFactory(x, z) {
 function createHospital(x, z) {
   var g = new THREE.Group();
   
-  var main = new THREE.Mesh(new THREE.BoxGeometry(30, 16, 22), MAT.hospitalWall);
-  main.position.y = 8;
-  if (QUALITY.shadows) main.castShadow = true;
+  var main = new THREE.Mesh(new THREE.BoxGeometry(26, 14, 20), MAT.hospitalWall);
+  main.position.y = 7;
   g.add(main);
   
   var stripe = new THREE.Mesh(
-    new THREE.BoxGeometry(30.5, 1, 22.5),
-    new THREE.MeshStandardMaterial({ color: 0xcc0000, roughness: 0.6 })
+    new THREE.BoxGeometry(26.5, 0.8, 20.5),
+    new THREE.MeshLambertMaterial({ color: 0xcc0000 })
   );
-  stripe.position.y = 3;
+  stripe.position.y = 2.5;
   g.add(stripe);
   
-  var crossV = new THREE.Mesh(new THREE.BoxGeometry(1, 4, 0.3), MAT.hospitalRed);
-  crossV.position.set(0, 20, 11.1);
+  var crossV = new THREE.Mesh(new THREE.BoxGeometry(0.8, 3.5, 0.3), MAT.hospitalRed);
+  crossV.position.set(0, 18, 10.1);
   g.add(crossV);
   
-  var crossH = new THREE.Mesh(new THREE.BoxGeometry(4, 1, 0.3), MAT.hospitalRed);
-  crossH.position.set(0, 20, 11.1);
+  var crossH = new THREE.Mesh(new THREE.BoxGeometry(3.5, 0.8, 0.3), MAT.hospitalRed);
+  crossH.position.set(0, 18, 10.1);
   g.add(crossH);
   
   g.position.set(x, 0, z);
@@ -999,26 +919,25 @@ function createHospital(x, z) {
 
 function createSouk(x, z) {
   var g = new THREE.Group();
-  var colors = [0xe74c3c, 0x3498db, 0xf39c12, 0x2ecc71, 0x9b59b6, 0xe67e22, 0x1abc9c, 0xcc3333];
+  var colors = [0xe74c3c, 0x3498db, 0xf39c12, 0x2ecc71, 0x9b59b6, 0xe67e22];
   
-  for (var i = 0; i < 12; i++) {
-    var angle = (i / 12) * Math.PI * 2;
-    var cx = Math.cos(angle) * 10;
-    var cz = Math.sin(angle) * 10;
+  for (var i = 0; i < 10; i++) {
+    var angle = (i / 10) * Math.PI * 2;
+    var cx = Math.cos(angle) * 9;
+    var cz = Math.sin(angle) * 9;
     
     var stall = new THREE.Mesh(
-      new THREE.BoxGeometry(3, 2.5, 3),
-      new THREE.MeshStandardMaterial({ color: colors[i % colors.length], roughness: 0.85 })
+      new THREE.BoxGeometry(2.8, 2.2, 2.8),
+      new THREE.MeshLambertMaterial({ color: colors[i % colors.length] })
     );
-    stall.position.set(cx, 1.25, cz);
-    if (QUALITY.shadows) stall.castShadow = true;
+    stall.position.set(cx, 1.1, cz);
     g.add(stall);
     
     var awning = new THREE.Mesh(
-      new THREE.ConeGeometry(2.8, 1.8, 4),
-      new THREE.MeshStandardMaterial({ color: 0xf5f5f5, roughness: 0.85 })
+      new THREE.ConeGeometry(2.5, 1.6, 4),
+      new THREE.MeshLambertMaterial({ color: 0xf5f5f5 })
     );
-    awning.position.set(cx, 3.6, cz);
+    awning.position.set(cx, 3.2, cz);
     awning.rotation.y = Math.PI / 4;
     g.add(awning);
   }
@@ -1031,46 +950,41 @@ function createBusStop(x, z, color) {
   var g = new THREE.Group();
   
   var sign = new THREE.Mesh(
-    new THREE.BoxGeometry(4, 2.5, 0.2),
-    new THREE.MeshStandardMaterial({ color: color })
+    new THREE.BoxGeometry(3.5, 2.2, 0.2),
+    new THREE.MeshLambertMaterial({ color: color })
   );
-  sign.position.y = 3;
+  sign.position.y = 2.8;
   g.add(sign);
   
   for (var s = -1; s <= 1; s += 2) {
     var pole = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.1, 0.1, 4),
-      new THREE.MeshStandardMaterial({ color: 0x666666, metalness: 0.6 })
+      new THREE.CylinderGeometry(0.1, 0.1, 3.5),
+      new THREE.MeshLambertMaterial({ color: 0x666666 })
     );
-    pole.position.set(s * 1.5, 2, 0);
+    pole.position.set(s * 1.3, 1.75, 0);
     g.add(pole);
   }
-  
-  var roof = new THREE.Mesh(
-    new THREE.BoxGeometry(6, 0.2, 4),
-    new THREE.MeshStandardMaterial({ color: 0x333333 })
-  );
-  roof.position.y = 4.2;
-  g.add(roof);
   
   g.position.set(x, 0, z);
   return g;
 }
 
 function createLandmarks() {
+  console.log('🏛️ بناء المعالم الحقيقية...');
   var group = new THREE.Group();
   
-  group.add(createStation(-250, -60));
-  group.add(createMosque(-120, 200));
-  group.add(createFactory(400, -300));
-  group.add(createHospital(-550, 140));
-  group.add(createSouk(100, 180));
-  group.add(createBusStop(180, 70, 0xe74c3c));
-  group.add(createBusStop(-150, -80, 0xf39c12));
-  group.add(createBusStop(400, 100, 0xe67e22));
-  group.add(createBusStop(550, -20, 0x2980b9));
+  group.add(createStation(-220, -60));
+  group.add(createMosque(-100, 180));
+  group.add(createFactory(350, -260));
+  group.add(createHospital(-480, 130));
+  group.add(createSouk(90, 160));
+  group.add(createBusStop(160, 60, 0xe74c3c));
+  group.add(createBusStop(-130, -70, 0xf39c12));
+  group.add(createBusStop(350, 90, 0xe67e22));
+  group.add(createBusStop(480, -18, 0x2980b9));
   
   scene.add(group);
+  console.log('✅ تم بناء', DESTINATIONS_DATA.length, 'معلم');
 }
 
 /* ============================================================
@@ -1083,34 +997,24 @@ function createCar(x, z, rot) {
   
   var body = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.6, 3.8), bodyMat);
   body.position.y = 0.5;
-  if (QUALITY.shadows) body.castShadow = true;
   car.add(body);
   
   var cabin = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.5, 1.8), bodyMat);
   cabin.position.set(0, 1.05, -0.2);
-  if (QUALITY.shadows) cabin.castShadow = true;
   car.add(cabin);
   
-  var windshield = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.4, 0.1), MAT.carGlass);
+  var windshield = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.4, 0.1), MAT.glass);
   windshield.position.set(0, 1.05, 0.7);
   car.add(windshield);
   
-  var tireGeo = new THREE.CylinderGeometry(0.32, 0.32, 0.22, 12);
-  var rimGeo = new THREE.CylinderGeometry(0.18, 0.18, 0.24, 8);
-  var rimMat = new THREE.MeshStandardMaterial({ color: 0xcccccc, roughness: 0.3, metalness: 0.8 });
+  var tireGeo = new THREE.CylinderGeometry(0.32, 0.32, 0.22, 8);
   
   for (var wx = -1; wx <= 1; wx += 2) {
     for (var wz = -1; wz <= 1; wz += 2) {
       var tire = new THREE.Mesh(tireGeo, MAT.carTire);
       tire.rotation.z = Math.PI / 2;
       tire.position.set(wx * 0.9, 0.32, wz * 1.2);
-      if (QUALITY.shadows) tire.castShadow = true;
       car.add(tire);
-      
-      var rim = new THREE.Mesh(rimGeo, rimMat);
-      rim.rotation.z = Math.PI / 2;
-      rim.position.set(wx * 0.9, 0.32, wz * 1.2);
-      car.add(rim);
     }
   }
   
@@ -1162,7 +1066,7 @@ function updateCars(dt) {
 }
 
 /* ============================================================
-   الناس الواقعيين
+   الناس
    ============================================================ */
 var people = [];
 function createPerson(x, z) {
@@ -1171,40 +1075,18 @@ function createPerson(x, z) {
   var shirtMat = Utils.pick(MAT.peopleShirt);
   var pantsMat = Utils.pick(MAT.peoplePants);
   var skinMat = Utils.pick(MAT.peopleSkin);
-  var hairMat = Utils.pick(MAT.peopleHair);
   
   var torso = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.65, 0.26), shirtMat);
   torso.position.y = 1.08;
-  if (QUALITY.shadows) torso.castShadow = true;
   p.add(torso);
   
-  var neck = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.1), skinMat);
-  neck.position.y = 1.43;
-  p.add(neck);
-  
-  var head = new THREE.Mesh(new THREE.SphereGeometry(0.17, 10, 10), skinMat);
+  var head = new THREE.Mesh(new THREE.SphereGeometry(0.17, 8, 8), skinMat);
   head.position.y = 1.62;
-  if (QUALITY.shadows) head.castShadow = true;
   p.add(head);
-  
-  var hair = new THREE.Mesh(
-    new THREE.SphereGeometry(0.18, 10, 10, 0, Math.PI * 2, 0, Math.PI / 2),
-    hairMat
-  );
-  hair.position.y = 1.65;
-  p.add(hair);
   
   var legs = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.8, 0.26), pantsMat);
   legs.position.y = 0.35;
-  if (QUALITY.shadows) legs.castShadow = true;
   p.add(legs);
-  
-  var shoes = new THREE.Mesh(
-    new THREE.BoxGeometry(0.44, 0.08, 0.32),
-    new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.9 })
-  );
-  shoes.position.y = -0.03;
-  p.add(shoes);
   
   var armGeo = new THREE.BoxGeometry(0.12, 0.58, 0.12);
   var armL = new THREE.Mesh(armGeo, shirtMat);
@@ -1289,120 +1171,98 @@ function createTukTuk() {
   var t = new THREE.Group();
   t.name = 'tukTuk';
   
-  var yellow = new THREE.MeshStandardMaterial({ color: 0xffc800, roughness: 0.35, metalness: 0.35 });
-  var yellowDark = new THREE.MeshStandardMaterial({ color: 0xe6a800, roughness: 0.4, metalness: 0.3 });
-  var black = new THREE.MeshStandardMaterial({ color: 0x0a0a0a, roughness: 0.7, metalness: 0.15 });
-  var rubber = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.95 });
-  var chrome = new THREE.MeshStandardMaterial({ color: 0xcccccc, roughness: 0.15, metalness: 0.95 });
-  var hlMat = new THREE.MeshBasicMaterial({ color: 0xffffcc });
-  var tlMat = new THREE.MeshBasicMaterial({ color: 0xff2222 });
-  var seatMat = new THREE.MeshStandardMaterial({ color: 0x2a2a2a, roughness: 0.9 });
-  var glassMat = new THREE.MeshPhysicalMaterial({
-    color: 0xaaddff, roughness: 0.05, metalness: 0.1,
-    transmission: 0.9, transparent: true, opacity: 0.45, thickness: 0.05, ior: 1.5,
-  });
-  
   // هيكل
-  var chassis = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.12, 2.4), black);
+  var chassis = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.12, 2.4), MAT.black);
   chassis.position.y = 0.42;
-  if (QUALITY.shadows) chassis.castShadow = true;
   t.add(chassis);
   
   // أرضية
-  var floorF = new THREE.Mesh(new THREE.BoxGeometry(1.25, 0.08, 1.0), black);
+  var floorF = new THREE.Mesh(new THREE.BoxGeometry(1.25, 0.08, 1.0), MAT.black);
   floorF.position.set(0, 0.52, 0.65);
   t.add(floorF);
   
-  var floorR = new THREE.Mesh(new THREE.BoxGeometry(1.25, 0.08, 1.3), black);
+  var floorR = new THREE.Mesh(new THREE.BoxGeometry(1.25, 0.08, 1.3), MAT.black);
   floorR.position.set(0, 0.52, -0.6);
   t.add(floorR);
   
   // مقدمة
-  var front = new THREE.Mesh(new THREE.BoxGeometry(1.28, 0.85, 1.0), yellow);
+  var front = new THREE.Mesh(new THREE.BoxGeometry(1.28, 0.85, 1.0), MAT.yellow);
   front.position.set(0, 0.95, 0.6);
-  if (QUALITY.shadows) front.castShadow = true;
   t.add(front);
   
   // كابينة خلفية
-  var rear = new THREE.Mesh(new THREE.BoxGeometry(1.32, 1.5, 1.4), yellow);
+  var rear = new THREE.Mesh(new THREE.BoxGeometry(1.32, 1.5, 1.4), MAT.yellow);
   rear.position.set(0, 1.25, -0.6);
-  if (QUALITY.shadows) rear.castShadow = true;
   t.add(rear);
   
   // سقف
-  var roof = new THREE.Mesh(new THREE.BoxGeometry(1.42, 0.1, 2.5), black);
+  var roof = new THREE.Mesh(new THREE.BoxGeometry(1.42, 0.1, 2.5), MAT.black);
   roof.position.set(0, 2.1, 0);
-  if (QUALITY.shadows) roof.castShadow = true;
   t.add(roof);
   
-  // أعمدة السقف
-  var pillarGeo = new THREE.CylinderGeometry(0.04, 0.04, 1.75, 6);
+  // أعمدة
+  var pillarGeo = new THREE.CylinderGeometry(0.04, 0.04, 1.75, 5);
   var positions = [
     [-0.62, 1.2, -1.2], [0.62, 1.2, -1.2],
     [-0.62, 1.2, -0.05], [0.62, 1.2, -0.05],
     [-0.62, 1.2, 1.05], [0.62, 1.2, 1.05],
   ];
   for (var i = 0; i < positions.length; i++) {
-    var p = new THREE.Mesh(pillarGeo, black);
+    var p = new THREE.Mesh(pillarGeo, MAT.black);
     p.position.set(positions[i][0], positions[i][1], positions[i][2]);
     t.add(p);
   }
   
   // زجاج أمامي
-  var windshield = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.85, 0.04), glassMat);
+  var windshield = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.85, 0.04), MAT.glass);
   windshield.position.set(0, 1.85, 1.1);
   windshield.rotation.x = -0.1;
   t.add(windshield);
   
   // زجاج جانبي
   for (var s = -1; s <= 1; s += 2) {
-    var sg = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.8, 0.9), glassMat);
+    var sg = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.8, 0.9), MAT.glass);
     sg.position.set(s * 0.64, 1.8, 0.6);
     t.add(sg);
     
-    var rg = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.95, 1.2), glassMat);
+    var rg = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.95, 1.2), MAT.glass);
     rg.position.set(s * 0.66, 1.7, -0.6);
     t.add(rg);
   }
   
   // زجاج خلفي
-  var rearGlass = new THREE.Mesh(new THREE.BoxGeometry(1.28, 1, 0.04), glassMat);
+  var rearGlass = new THREE.Mesh(new THREE.BoxGeometry(1.28, 1, 0.04), MAT.glass);
   rearGlass.position.set(0, 1.7, -1.28);
   t.add(rearGlass);
   
   // مصابيح أمامية
-  var hlGeo = new THREE.CylinderGeometry(0.12, 0.12, 0.08, 12);
+  var hlGeo = new THREE.CylinderGeometry(0.12, 0.12, 0.08, 8);
   for (var s = -1; s <= 1; s += 2) {
-    var hl = new THREE.Mesh(hlGeo, chrome);
-    hl.rotation.x = Math.PI / 2;
-    hl.position.set(s * 0.44, 1.15, 1.12);
-    t.add(hl);
-    
-    var hlg = new THREE.Mesh(hlGeo, hlMat);
+    var hlg = new THREE.Mesh(hlGeo, MAT.headlight);
     hlg.rotation.x = Math.PI / 2;
-    hlg.position.set(s * 0.44, 1.15, 1.15);
+    hlg.position.set(s * 0.44, 1.15, 1.12);
     t.add(hlg);
   }
   
   // فوانيس خلفية
   var tlGeo = new THREE.BoxGeometry(0.12, 0.2, 0.05);
   for (var s = -1; s <= 1; s += 2) {
-    var tl = new THREE.Mesh(tlGeo, tlMat);
+    var tl = new THREE.Mesh(tlGeo, MAT.taillight);
     tl.position.set(s * 0.48, 0.9, -1.3);
     t.add(tl);
   }
   
-  // شبكة أمامية
-  var grill = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.3, 0.06), chrome);
+  // شبكة
+  var grill = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.3, 0.06), MAT.chrome);
   grill.position.set(0, 0.95, 1.13);
   t.add(grill);
   
   // مقود
   var steerG = new THREE.Group();
-  var steerRing = new THREE.Mesh(new THREE.TorusGeometry(0.15, 0.02, 6, 16), black);
+  var steerRing = new THREE.Mesh(new THREE.TorusGeometry(0.15, 0.02, 5, 12), MAT.black);
   steerG.add(steerRing);
   for (var i = 0; i < 3; i++) {
-    var spoke = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.14, 0.015), black);
+    var spoke = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.14, 0.015), MAT.black);
     spoke.rotation.z = (i / 3) * Math.PI * 2;
     steerG.add(spoke);
   }
@@ -1411,14 +1271,14 @@ function createTukTuk() {
   t.add(steerG);
   
   // لوحة قيادة
-  var dash = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.2, 0.3), black);
+  var dash = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.2, 0.3), MAT.black);
   dash.position.set(0, 1.3, 0.95);
   t.add(dash);
   
   // مقاعد
+  var seatMat = new THREE.MeshLambertMaterial({ color: 0x2a2a2a });
   var seat1 = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.1, 0.45), seatMat);
   seat1.position.set(0, 0.78, 0.3);
-  if (QUALITY.shadows) seat1.castShadow = true;
   t.add(seat1);
   
   var back1 = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.08), seatMat);
@@ -1427,7 +1287,6 @@ function createTukTuk() {
   
   var seat2 = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.1, 0.5), seatMat);
   seat2.position.set(0, 0.78, -0.7);
-  if (QUALITY.shadows) seat2.castShadow = true;
   t.add(seat2);
   
   var back2 = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.6, 0.08), seatMat);
@@ -1441,12 +1300,11 @@ function createTukTuk() {
     var wg = new THREE.Group();
     wg.userData.isFront = isFront;
     
-    var tire = new THREE.Mesh(new THREE.TorusGeometry(0.24, 0.1, 8, 16), rubber);
+    var tire = new THREE.Mesh(new THREE.TorusGeometry(0.24, 0.1, 6, 12), MAT.carTire);
     tire.rotation.y = Math.PI / 2;
-    if (QUALITY.shadows) tire.castShadow = true;
     wg.add(tire);
     
-    var rim = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.12, 8), chrome);
+    var rim = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.12, 6), MAT.chrome);
     rim.rotation.z = Math.PI / 2;
     wg.add(rim);
     
@@ -1460,17 +1318,9 @@ function createTukTuk() {
   makeWheel(-0.6, -0.75, false);
   makeWheel(0.6, -0.75, false);
   
-  // إضاءة
-  var headlight = new THREE.SpotLight(0xfff5cc, 2, 25, Math.PI / 5, 0.4, 1.5);
-  headlight.position.set(0, 1.15, 1.1);
-  headlight.target.position.set(0, 0.2, 15);
-  t.add(headlight);
-  t.add(headlight.target);
-  
   t.userData = {
     wheels: wheels,
     steeringWheel: steerG,
-    headlight: headlight,
   };
   
   return t;
@@ -1492,39 +1342,39 @@ var player = {
   hasPassenger: false,
   currentPassenger: null,
   tripStartTime: 0,
-  dialogTimer: 0,
 };
 
 /* ============================================================
-   كاميرا الشخص الثالث
+   كاميرا الشخص الثالث - مُصلَّحة (مش هتتقلب)
    ============================================================ */
-var cameraOffset = {
-  distance: 7.5,
-  height: 3.8,
-  lookAtHeight: 1.3,
-};
+var CAMERA_DISTANCE = 7;
+var CAMERA_HEIGHT = 3.5;
+var CAMERA_LOOK_HEIGHT = 1.2;
 
 function updateCamera(dt) {
-  var forward = new THREE.Vector3(
-    Math.sin(tukTuk.rotation.y),
-    0,
-    Math.cos(tukTuk.rotation.y)
-  );
+  // حساب الموقع المثالي للكاميرا (خلف التوك توك)
+  var forwardX = Math.sin(tukTuk.rotation.y);
+  var forwardZ = Math.cos(tukTuk.rotation.y);
   
-  var targetPos = tukTuk.position.clone()
-    .sub(forward.multiplyScalar(cameraOffset.distance))
-    .add(new THREE.Vector3(0, cameraOffset.height, 0));
+  var targetX = tukTuk.position.x - forwardX * CAMERA_DISTANCE;
+  var targetY = CAMERA_HEIGHT;
+  var targetZ = tukTuk.position.z - forwardZ * CAMERA_DISTANCE;
   
-  var smoothFactor = 1 - Math.pow(0.001, dt);
-  camera.position.lerp(targetPos, smoothFactor);
+  // تحرك ناعم
+  var smoothFactor = 1 - Math.pow(0.0001, dt);
+  camera.position.x += (targetX - camera.position.x) * smoothFactor;
+  camera.position.y += (targetY - camera.position.y) * smoothFactor;
+  camera.position.z += (targetZ - camera.position.z) * smoothFactor;
   
-  var lookTarget = tukTuk.position.clone();
-  lookTarget.y += cameraOffset.lookAtHeight;
+  // النقطة اللي الكاميرا بتبص عليها
+  var lookX = tukTuk.position.x;
+  var lookY = tukTuk.position.y + CAMERA_LOOK_HEIGHT;
+  var lookZ = tukTuk.position.z;
   
-  camera.lookAt(lookTarget);
+  camera.lookAt(lookX, lookY, lookZ);
   
-  var sr = Math.min(Math.abs(player.speed) / CONFIG.maxSpeed, 1);
-  camera.rotation.z = -player.steering * 0.03 * sr;
+  // ⚠️ مهم: مفيش أي تعديل على camera.rotation.z
+  // ده اللي كان بيسبب مشكلة الشاشة المقلوبة
 }
 
 /* ============================================================
@@ -1698,8 +1548,7 @@ function updateTukTukPhysics(dt) {
   }
   
   tukTuk.userData.steeringWheel.rotation.z = -player.steering * Math.PI * 0.85;
-  
-  tukTuk.position.y = Math.max(0, Math.sin(performance.now() * 0.02) * 0.005 * (1 + speedRatio));
+  tukTuk.position.y = 0;
 }
 
 /* ============================================================
@@ -1731,19 +1580,19 @@ function getPassengerSpawnPoint() {
     var rd = ROADS_DATA[i];
     if (rd.width < 14) continue;
     
-    var steps = Math.floor(rd.length / 80);
+    var steps = Math.floor(rd.length / 100);
     for (var j = 0; j < steps; j++) {
-      var off = -rd.length / 2 + j * 80 + 40;
+      var off = -rd.length / 2 + j * 100 + 50;
       var side = Math.random() > 0.5 ? 1 : -1;
       var so = side * (rd.width / 2 + CONFIG.sidewalkWidth / 2);
       var x = rd.x + Math.sin(rd.rotation) * off + Math.cos(rd.rotation) * so;
       var z = rd.z + Math.cos(rd.rotation) * off - Math.sin(rd.rotation) * so;
       
       if (Math.abs(z) < CONFIG.canalWidth / 2 + 4) continue;
-      if (Math.abs(x + 280) < 8) continue;
+      if (Math.abs(x + 250) < 8) continue;
       
       var dist = Math.hypot(x - tukTuk.position.x, z - tukTuk.position.z);
-      if (dist < 60 || dist > 400) continue;
+      if (dist < 50 || dist > 350) continue;
       
       candidates.push({ x: x, z: z });
     }
@@ -1756,35 +1605,26 @@ function getPassengerSpawnPoint() {
 function createPassengerMesh() {
   var group = new THREE.Group();
   
-  var shirtColors = [0xe74c3c, 0x3498db, 0x2ecc71, 0xf39c12, 0x9b59b6, 0xe67e22];
-  var skinColors = [0xf5d5b0, 0xe0b890, 0xc89870];
+  var shirtMat = Utils.pick(MAT.peopleShirt);
+  var pantsMat = Utils.pick(MAT.peoplePants);
+  var skinMat = Utils.pick(MAT.peopleSkin);
   
-  var shirtColor = Utils.pick(shirtColors);
-  var skinColor = Utils.pick(skinColors);
-  
-  var torsoMat = new THREE.MeshStandardMaterial({ color: shirtColor, roughness: 0.85 });
-  var torso = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.65, 0.28), torsoMat);
+  var torso = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.65, 0.28), shirtMat);
   torso.position.y = 1.1;
-  if (QUALITY.shadows) torso.castShadow = true;
   group.add(torso);
   
-  var headMat = new THREE.MeshStandardMaterial({ color: skinColor, roughness: 0.9 });
-  var head = new THREE.Mesh(new THREE.SphereGeometry(0.16, 8, 8), headMat);
+  var head = new THREE.Mesh(new THREE.SphereGeometry(0.16, 8, 8), skinMat);
   head.position.y = 1.6;
-  if (QUALITY.shadows) head.castShadow = true;
   group.add(head);
   
-  var legsMat = new THREE.MeshStandardMaterial({ color: 0x2c3e50, roughness: 0.9 });
-  var legs = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.75, 0.28), legsMat);
+  var legs = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.75, 0.28), pantsMat);
   legs.position.y = 0.4;
-  if (QUALITY.shadows) legs.castShadow = true;
   group.add(legs);
   
-  // هالة
   var ringMat = new THREE.MeshBasicMaterial({
     color: 0x00ff88, transparent: true, opacity: 0.7, side: THREE.DoubleSide,
   });
-  var ring = new THREE.Mesh(new THREE.RingGeometry(0.5, 0.75, 16), ringMat);
+  var ring = new THREE.Mesh(new THREE.RingGeometry(0.5, 0.75, 12), ringMat);
   ring.rotation.x = -Math.PI / 2;
   ring.position.y = 0.05;
   group.add(ring);
@@ -1830,7 +1670,7 @@ function createDestinationMarker(destination) {
   var ringMat = new THREE.MeshBasicMaterial({
     color: destination.color, transparent: true, opacity: 0.7, side: THREE.DoubleSide,
   });
-  var ring = new THREE.Mesh(new THREE.RingGeometry(2, 3, 24), ringMat);
+  var ring = new THREE.Mesh(new THREE.RingGeometry(2, 3, 16), ringMat);
   ring.rotation.x = -Math.PI / 2;
   ring.position.y = 0.1;
   group.add(ring);
@@ -1838,25 +1678,20 @@ function createDestinationMarker(destination) {
   var beamMat = new THREE.MeshBasicMaterial({
     color: destination.color, transparent: true, opacity: 0.25, side: THREE.DoubleSide,
   });
-  var beam = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 1.5, 8, 12, 1, true), beamMat);
+  var beam = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 1.5, 8, 8, 1, true), beamMat);
   beam.position.y = 4;
   group.add(beam);
   
   var iconMat = new THREE.MeshBasicMaterial({ color: destination.color });
-  var icon = new THREE.Mesh(new THREE.SphereGeometry(0.6, 12, 12), iconMat);
+  var icon = new THREE.Mesh(new THREE.SphereGeometry(0.6, 10, 10), iconMat);
   icon.position.y = 6;
   group.add(icon);
-  
-  var pointLight = new THREE.PointLight(destination.color, 1.2, 12);
-  pointLight.position.y = 3;
-  group.add(pointLight);
   
   group.position.set(destination.x, 0, destination.z);
   group.userData = {
     destination: destination,
     startTime: performance.now(),
     icon: icon,
-    beam: beam,
     ring: ring,
   };
   
@@ -1884,8 +1719,6 @@ function checkPassengerPickup() {
       scene.add(activeDestination);
       
       AudioSystem.playPickup();
-      
-      // جملة السواق
       UI.showDialog(Utils.pick(DIALOGS.pickup), 3000);
       UI.showToast('✅ راكب صعد! → ' + dest.name, 2500);
       
@@ -1999,7 +1832,6 @@ function updatePassengers(dt) {
     ud.icon.position.y = 6 + Math.sin(time * 2) * 0.3;
   }
   
-  // جمل السواق العشوائية
   if (player.hasPassenger) {
     gameState.dialogTimer -= dt;
     if (gameState.dialogTimer <= 0) {
@@ -2012,6 +1844,9 @@ function updatePassengers(dt) {
 /* ============================================================
    الحلقة الرئيسية
    ============================================================ */
+var frameCount = 0;
+var lastFPSUpdate = 0;
+
 function animate() {
   requestAnimationFrame(animate);
   
@@ -2067,16 +1902,14 @@ function animate() {
 async function buildCity(onProgress) {
   var steps = [
     { name: 'إنشاء الأرضية...', fn: createGround, weight: 5 },
-    { name: 'بناء ترعة المحمودية...', fn: createCanal, weight: 15 },
+    { name: 'بناء ترعة المحمودية...', fn: createCanal, weight: 10 },
     { name: 'رصف الشوارع...', fn: createRoads, weight: 20 },
-    { name: 'مد السكة الحديد...', fn: createRailway, weight: 10 },
-    { name: 'زراعة النخيل والأشجار...', fn: createFoliage, weight: 15 },
+    { name: 'مد السكة الحديد...', fn: createRailway, weight: 5 },
+    { name: 'زراعة النخيل والأشجار...', fn: createFoliage, weight: 10 },
     { name: 'بناء المباني...', fn: createBuildings, weight: 20 },
-    { name: 'بناء المعالم...', fn: createLandmarks, weight: 10 },
-    { name: 'إضافة الناس والسيارات...', fn: function() {
-      createPeople();
-      createCars();
-    }, weight: 5 },
+    { name: 'بناء المعالم الحقيقية...', fn: createLandmarks, weight: 15 },
+    { name: 'إضافة الناس...', fn: createPeople, weight: 10 },
+    { name: 'إضافة السيارات...', fn: createCars, weight: 5 },
   ];
   
   var accumulated = 0;
@@ -2087,10 +1920,10 @@ async function buildCity(onProgress) {
     if (onProgress) onProgress(Math.round((accumulated / totalWeight) * 100), step.name);
     
     await new Promise(function(resolve) {
-      requestAnimationFrame(function() {
+      setTimeout(function() {
         try { step.fn(); } catch (e) { console.error('خطأ في', step.name, e); }
         resolve();
-      });
+      }, 16);
     });
     
     accumulated += step.weight;
@@ -2224,10 +2057,17 @@ function resetGame() {
     tukTuk.userData.passengerRider = null;
   }
   
-  var forward = new THREE.Vector3(0, 0, 1);
-  camera.position.copy(tukTuk.position).sub(forward.multiplyScalar(cameraOffset.distance));
-  camera.position.y = cameraOffset.height;
-  camera.lookAt(tukTuk.position.x, cameraOffset.lookAtHeight, tukTuk.position.z);
+  // ضبط الكاميرا خلف التوك توك
+  camera.position.set(
+    tukTuk.position.x,
+    CAMERA_HEIGHT,
+    tukTuk.position.z - CAMERA_DISTANCE
+  );
+  camera.lookAt(
+    tukTuk.position.x,
+    CAMERA_LOOK_HEIGHT,
+    tukTuk.position.z
+  );
   
   updateHUD();
   updateMissionUI();
@@ -2275,11 +2115,17 @@ function endGame() {
    ============================================================ */
 function toggleFullscreen() {
   if (!document.fullscreenElement) {
-    document.documentElement.requestFullscreen().catch(function(e) {
-      console.log('Fullscreen error:', e);
-    });
+    if (document.documentElement.requestFullscreen) {
+      document.documentElement.requestFullscreen();
+    } else if (document.documentElement.webkitRequestFullscreen) {
+      document.documentElement.webkitRequestFullscreen();
+    }
   } else {
-    document.exitFullscreen();
+    if (document.exitFullscreen) {
+      document.exitFullscreen();
+    } else if (document.webkitExitFullscreen) {
+      document.webkitExitFullscreen();
+    }
   }
 }
 
