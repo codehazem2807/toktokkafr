@@ -8,9 +8,6 @@
 <meta name="theme-color" content="#0a0a1e">
 <title>🛺 توك توك كفر الدوار - 3D</title>
 <style>
-  /* ============================================
-     إعادة تعيين عامة
-     ============================================ */
   * {
     margin: 0;
     padding: 0;
@@ -43,9 +40,6 @@
     touch-action: none;
   }
 
-  /* ============================================
-     شاشة التحميل والبداية
-     ============================================ */
   .overlay {
     position: fixed;
     inset: 0;
@@ -63,6 +57,7 @@
   .overlay.hidden {
     opacity: 0;
     pointer-events: none;
+    display: none;
   }
 
   .overlay h1 {
@@ -111,7 +106,11 @@
     box-shadow: 0 3px 0 #8a6d00;
   }
 
-  /* شريط التحميل */
+  .overlay button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
   .loading-bar {
     width: min(320px, 80vw);
     height: 8px;
@@ -138,15 +137,12 @@
     letter-spacing: 1px;
   }
 
-  /* ============================================
-     واجهة اللعب (HUD)
-     ============================================ */
   #hud {
     position: fixed;
     top: max(12px, env(safe-area-inset-top));
     left: 12px;
     right: 12px;
-    display: flex;
+    display: none;
     justify-content: space-between;
     align-items: flex-start;
     pointer-events: none;
@@ -199,7 +195,6 @@
     50% { opacity: 0.4; }
   }
 
-  /* سرعة */
   #speedPanel {
     text-align: center;
     min-width: 80px;
@@ -218,9 +213,6 @@
     letter-spacing: 1px;
   }
 
-  /* ============================================
-     المهمة الحالية
-     ============================================ */
   #missionPanel {
     position: fixed;
     top: max(90px, calc(env(safe-area-inset-top) + 90px));
@@ -240,11 +232,9 @@
     text-overflow: ellipsis;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
     font-weight: 600;
+    display: none;
   }
 
-  /* ============================================
-     أزرار التحكم للموبايل
-     ============================================ */
   #mobileControls {
     position: fixed;
     inset: 0;
@@ -276,16 +266,15 @@
     transition: transform 0.08s, background 0.08s;
     user-select: none;
     -webkit-user-select: none;
+    font-family: inherit;
   }
 
   .mobile-btn:active,
   .mobile-btn.pressed {
     background: rgba(255, 200, 0, 0.55);
     transform: scale(0.92);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5), inset 0 0 25px rgba(255, 200, 0, 0.4);
   }
 
-  /* أزرار القيادة (يسار) */
   #btnSteerLeft {
     bottom: max(30px, env(safe-area-inset-bottom));
     left: 20px;
@@ -302,7 +291,6 @@
     font-size: 30px;
   }
 
-  /* أزرار الحركة (يمين) */
   #btnAccel {
     bottom: max(115px, calc(env(safe-area-inset-bottom) + 115px));
     right: 25px;
@@ -312,7 +300,6 @@
     background: rgba(0, 255, 136, 0.25);
     border-color: rgba(0, 255, 136, 0.8);
     color: #00ff88;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4), inset 0 0 20px rgba(0, 255, 136, 0.2);
   }
 
   #btnAccel:active,
@@ -329,7 +316,6 @@
     background: rgba(255, 60, 60, 0.25);
     border-color: rgba(255, 60, 60, 0.8);
     color: #ff4444;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4), inset 0 0 20px rgba(255, 60, 60, 0.2);
   }
 
   #btnBrake:active,
@@ -337,7 +323,6 @@
     background: rgba(255, 60, 60, 0.55);
   }
 
-  /* زر فرملة اليد */
   #btnHandbrake {
     bottom: max(30px, env(safe-area-inset-bottom));
     right: 125px;
@@ -349,9 +334,6 @@
     color: #ff8c00;
   }
 
-  /* ============================================
-     كروس هير
-     ============================================ */
   #crosshair {
     position: fixed;
     top: 50%;
@@ -362,6 +344,7 @@
     pointer-events: none;
     z-index: 50;
     opacity: 0.6;
+    display: none;
   }
 
   #crosshair::before,
@@ -386,9 +369,6 @@
     transform: translateY(-50%);
   }
 
-  /* ============================================
-     إشعارات طائرة
-     ============================================ */
   #toast {
     position: fixed;
     top: 45%;
@@ -408,6 +388,7 @@
     text-align: center;
     white-space: nowrap;
     box-shadow: 0 0 40px rgba(255, 200, 0, 0.5);
+    font-family: inherit;
   }
 
   #toast.show {
@@ -415,9 +396,6 @@
     transform: translate(-50%, -50%) scale(1);
   }
 
-  /* ============================================
-     تعليمات على الشاشة
-     ============================================ */
   #hint {
     position: fixed;
     bottom: max(140px, calc(env(safe-area-inset-bottom) + 140px));
@@ -442,9 +420,6 @@
     opacity: 0;
   }
 
-  /* ============================================
-     زر الإيقاف المؤقت
-     ============================================ */
   #pauseBtn {
     position: fixed;
     top: max(12px, env(safe-area-inset-top));
@@ -456,18 +431,16 @@
     border-radius: 12px;
     color: #ffc800;
     font-size: 20px;
-    display: flex;
+    display: none;
     align-items: center;
     justify-content: center;
     z-index: 110;
     cursor: pointer;
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
+    font-family: inherit;
   }
 
-  /* ============================================
-     شاشة النهاية
-     ============================================ */
   #endScreen .result-card {
     background: rgba(0, 0, 0, 0.6);
     border: 2px solid rgba(255, 200, 0, 0.5);
@@ -498,36 +471,28 @@
     font-weight: 900;
   }
 
-  /* ============================================
-     لوحة الأزرار في الشاشات الصغيرة
-     ============================================ */
   @media (max-width: 500px) {
-    #hud-stats .hud-item {
+    .hud-item {
       min-width: 40px;
     }
-
     .hud-panel {
       padding: 8px 12px;
     }
-
     #btnSteerLeft,
     #btnSteerRight {
       width: 65px;
       height: 65px;
       font-size: 26px;
     }
-
     #btnSteerRight {
       left: 95px;
     }
-
     #btnAccel,
     #btnBrake {
       width: 75px;
       height: 75px;
       font-size: 30px;
     }
-
     #btnHandbrake {
       width: 52px;
       height: 52px;
@@ -539,15 +504,9 @@
 </head>
 <body>
 
-<!-- ============================================
-     الكانفس الرئيسي
-     ============================================ -->
 <canvas id="gameCanvas"></canvas>
 
-<!-- ============================================
-     واجهة اللعب
-     ============================================ -->
-<div id="hud" class="hidden" style="display:none;">
+<div id="hud">
   <div class="hud-panel hud-stats">
     <div class="hud-item">
       <div class="hud-label">💰 الفلوس</div>
@@ -568,13 +527,10 @@
   </div>
 </div>
 
-<div id="missionPanel" style="display:none;">🚕 جاري تحميل المدينة...</div>
+<div id="missionPanel">🚕 جاري تحميل المدينة...</div>
 
-<div id="pauseBtn" style="display:none;">⏸️</div>
+<div id="pauseBtn">⏸️</div>
 
-<!-- ============================================
-     أزرار التحكم للموبايل
-     ============================================ -->
 <div id="mobileControls">
   <button class="mobile-btn" id="btnSteerLeft">◀</button>
   <button class="mobile-btn" id="btnSteerRight">▶</button>
@@ -583,15 +539,12 @@
   <button class="mobile-btn" id="btnHandbrake">🅿️</button>
 </div>
 
-<div id="crosshair" style="display:none;"></div>
+<div id="crosshair"></div>
 
 <div id="hint" class="hidden">جاري التحميل...</div>
 
 <div id="toast"></div>
 
-<!-- ============================================
-     شاشة البداية
-     ============================================ -->
 <div class="overlay" id="startScreen">
   <h1>🛺 توك توك كفر الدوار</h1>
   <div class="subtitle">رحلة ثلاثية الأبعاد</div>
@@ -599,7 +552,7 @@
     📍 الطريق الزراعي • ترعة المحمودية • شارع أحمد عرابي
   </div>
   <div class="info" style="color: #666; font-size: 12px; margin-top: 10px;">
-    منظّم وموثّق طبقاً لبيانات الوحدة المحلية
+    بناءً على بيانات الوحدة المحلية لكفر الدوار
   </div>
   <button id="startBtn">🚀 ابدأ الرحلة</button>
   <div class="loading-bar">
@@ -608,9 +561,6 @@
   <div id="loadingText">جاري التحضير...</div>
 </div>
 
-<!-- ============================================
-     شاشة النهاية
-     ============================================ -->
 <div class="overlay hidden" id="endScreen">
   <h1 id="endTitle">انتهت الرحلة!</h1>
   <div class="result-card">
@@ -630,21 +580,11 @@
   <button id="restartBtn">🔄 العب تاني</button>
 </div>
 
-<!-- ============================================
-     تحميل مكتبة Three.js
-     ============================================ -->
-<script type="importmap">
-{
-  "imports": {
-    "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
-  }
-}
-</script>
+<!-- تحميل Three.js من CDN -->
+<script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
 
-<!-- ============================================
-     السكريبت الرئيسي
-     ============================================ -->
-<script type="module" src="./game.js"></script>
+<!-- كود اللعبة -->
+<script src="game.js"></script>
 
 </body>
 </html>
