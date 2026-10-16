@@ -1,12 +1,12 @@
 /* ============================================================
-   🛺 توك توك كفر الدوار - النسخة الشعبية الاحترافية النهائية
-   مباني احترافية + كلام شعبي + إشارات مرور + لجان
+   🛺 توك توك كفر الدوار - النسخة الاحترافية V2
+   الجزء 1: الإعدادات + المدينة + الخريطة + المواد
    ============================================================ */
 
 (function() {
 'use strict';
 
-console.log('🚀 بدء تحميل لعبة توك توك كفر الدوار...');
+console.log('🚀 بدء تحميل لعبة توك توك كفر الدوار V2...');
 
 if (typeof THREE === 'undefined') {
   alert('فشل تحميل Three.js. تأكد من الاتصال بالإنترنت.');
@@ -18,59 +18,59 @@ if (typeof THREE === 'undefined') {
    ============================================================ */
 var isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
   || (navigator.maxTouchPoints && navigator.maxTouchPoints > 2);
-var isLowEnd = isMobile;
+var isLowEnd = isMobile && (navigator.hardwareConcurrency || 2) <= 4;
 
-console.log('📱 الجهاز:', isMobile ? 'موبايل' : 'كمبيوتر');
+console.log('📱 الجهاز:', isMobile ? (isLowEnd ? 'موبايل ضعيف' : 'موبايل') : 'كمبيوتر');
 
 /* ============================================================
-   إعدادات الجودة
+   الجودة
    ============================================================ */
 var QUALITY = {
-  pixelRatio: isLowEnd ? 0.85 : 1.5,
-  shadows: false,
-  fogFar: isLowEnd ? 300 : 550,
-  treeCount: isLowEnd ? 20 : 50,
-  buildingDensity: isLowEnd ? 0.45 : 0.7,
-  peopleCount: isLowEnd ? 10 : 25,
-  carsCount: isLowEnd ? 4 : 10,
-  maxBuildings: isLowEnd ? 250 : 500,
-  detailedBuildings: isLowEnd ? 60 : 150,
+  pixelRatio: isLowEnd ? 0.85 : (isMobile ? 1.2 : 1.6),
+  fogFar: isLowEnd ? 320 : (isMobile ? 500 : 750),
+  treeCount: isLowEnd ? 25 : (isMobile ? 50 : 90),
+  buildingDensity: isLowEnd ? 0.45 : (isMobile ? 0.6 : 0.8),
+  peopleCount: isLowEnd ? 15 : (isMobile ? 30 : 60),
+  carsCount: isLowEnd ? 5 : (isMobile ? 10 : 20),
+  maxBuildings: isLowEnd ? 200 : (isMobile ? 350 : 600),
+  detailedBuildings: isLowEnd ? 50 : (isMobile ? 100 : 200),
 };
 
 /* ============================================================
-   الإعدادات
+   الإعدادات العامة
    ============================================================ */
 var CONFIG = {
-  citySize: 1200,
-  canalWidth: 22,
-  roadWidth: 20,
-  sidewalkWidth: 3,
-  maxSpeed: 14,
-  maxReverseSpeed: 4,
-  acceleration: 6,
-  braking: 12,
-  friction: 0.7,
-  steeringSpeed: 3,
-  maxWheelAngle: 0.55,
+  citySize: 1300,
+  canalWidth: 24,
+  roadWidth: 22,
+  sidewalkWidth: 3.2,
+  maxSpeed: 15,
+  maxReverseSpeed: 5,
+  acceleration: 7,
+  braking: 14,
+  friction: 0.8,
+  steeringSpeed: 3.2,
+  maxWheelAngle: 0.58,
   gameDuration: 300,
   deliveryBonus: 30,
   maxPassengers: 3,
+  minimapSize: 160,
 };
 
 var COLORS = {
   sky: 0x87CEEB,
-  ground: 0x6a9a5a,
+  ground: 0x6a8a4a,
   road: 0x2a2a2a,
-  sidewalk: 0xa8a8a8,
-  canal: 0x1a6a9a,
+  sidewalk: 0xb0a890,
+  canal: 0x2a6a9a,
 };
 
 /* ============================================================
-   المشهد والكاميرا
+   المشهد
    ============================================================ */
 var scene = new THREE.Scene();
 scene.background = new THREE.Color(COLORS.sky);
-scene.fog = new THREE.Fog(COLORS.sky, 80, QUALITY.fogFar);
+scene.fog = new THREE.Fog(COLORS.sky, 100, QUALITY.fogFar);
 
 var camera = new THREE.PerspectiveCamera(
   62,
@@ -81,31 +81,28 @@ var camera = new THREE.PerspectiveCamera(
 
 var renderer = new THREE.WebGLRenderer({
   canvas: document.getElementById('gameCanvas'),
-  antialias: false,
+  antialias: !isLowEnd,
   powerPreference: 'high-performance',
   stencil: false,
   alpha: false,
-  depth: true,
 });
 
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, QUALITY.pixelRatio));
 renderer.shadowMap.enabled = false;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.1;
 
-/* ============================================================
-   حل مشكلة الشاشة المقلوبة
-   ============================================================ */
+/* حل مشكلة الشاشة المقلوبة */
 function handleResize() {
   var w = window.innerWidth;
   var h = window.innerHeight;
-  
   camera.aspect = w / h;
   camera.updateProjectionMatrix();
   renderer.setSize(w, h, false);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, QUALITY.pixelRatio));
 }
-
 window.addEventListener('resize', handleResize);
 window.addEventListener('orientationchange', function() {
   setTimeout(handleResize, 150);
@@ -115,18 +112,19 @@ window.addEventListener('orientationchange', function() {
 /* ============================================================
    الإضاءة
    ============================================================ */
-var sunLight = new THREE.DirectionalLight(0xfff5e0, 1.8);
+var sunLight = new THREE.DirectionalLight(0xfff5e0, 2.0);
 sunLight.position.set(180, 250, 120);
 scene.add(sunLight);
 scene.add(sunLight.target);
 
-scene.add(new THREE.AmbientLight(0xffffff, 1.4));
-scene.add(new THREE.HemisphereLight(0x87CEEB, 0x4a5a3a, 0.9));
+scene.add(new THREE.AmbientLight(0xffffff, 1.3));
+scene.add(new THREE.HemisphereLight(0x87CEEB, 0x4a5a3a, 1.0));
 
 /* ============================================================
    واجهة المستخدم
    ============================================================ */
 var UI = {
+  loadingScreen: document.getElementById('loadingScreen'),
   startScreen: document.getElementById('startScreen'),
   endScreen: document.getElementById('endScreen'),
   startBtn: document.getElementById('startBtn'),
@@ -136,6 +134,7 @@ var UI = {
   hud: document.getElementById('hud'),
   missionPanel: document.getElementById('missionPanel'),
   pauseBtn: document.getElementById('pauseBtn'),
+  radioBtn: document.getElementById('radioBtn'),
   fullscreenBtn: document.getElementById('fullscreenBtn'),
   controls: document.getElementById('controls'),
   hint: document.getElementById('hint'),
@@ -150,6 +149,12 @@ var UI = {
   endMoney: document.getElementById('endMoney'),
   endDeliveries: document.getElementById('endDeliveries'),
   endRating: document.getElementById('endRating'),
+  minimapCanvas: document.getElementById('minimapCanvas'),
+  radioPanel: document.getElementById('radioPanel'),
+  radioToggle: document.getElementById('radioToggle'),
+  radioTrack: document.getElementById('radioTrack'),
+  radioPrev: document.getElementById('radioPrev'),
+  radioNext: document.getElementById('radioNext'),
   
   updateLoading: function(pct, text) {
     if (this.loadingFill) this.loadingFill.style.width = pct + '%';
@@ -204,7 +209,7 @@ var Utils = {
 };
 
 /* ============================================================
-   🗣️ كلام السواق الشعبي المصري
+   🗣️ جمل السواق الشعبي المصري
    ============================================================ */
 var DIALOGS = {
   pickup: [
@@ -237,7 +242,9 @@ var DIALOGS = {
     'ده شارع بورسعيد يسطا',
     'خد بالك من التوكتوك اللي جاي',
     'معلش يسطا، أصل الزحمة كتير',
-    'ربنا يكرمك يا معلم'
+    'ربنا يكرمك يا معلم',
+    'الحمد لله على كل حال',
+    'إحنا قربنا نخلص النهاردة'
   ],
   arrived: [
     'وصلنا يا باشا، اتفضل',
@@ -259,29 +266,108 @@ var DIALOGS = {
     '🛑 لجنة يا معلم، هدّي شوية',
     '🛑 واقفين في اللجنة، خد بالك',
     '🛑 ظابط بيشاورلنا، هدّي'
+  ],
+  honk: [
+    '📢 كلاكس يا معلم',
+    '📢 هدّي الطريق يسطا',
+    '📢 خد بالك، أنا جاي'
   ]
+};
+
+/* ============================================================
+   🎵 الراديو الشعبي
+   ============================================================ */
+var RADIO_TRACKS = [
+  { file: '1.mp3', name: 'الطريق الزراعي' },
+  { file: '2.mp3', name: 'شوارع كفر الدوار' },
+  { file: '3.mp3', name: 'ترعة المحمودية' },
+  { file: '4.mp3', name: 'أغاني شعبية' },
+  { file: '5.mp3', name: 'كورنيش الإسكندرية' },
+];
+
+var radio = {
+  audio: null,
+  currentTrack: 0,
+  isPlaying: false,
+  enabled: true,
+  
+  init: function() {
+    this.audio = new Audio();
+    this.audio.volume = 0.35;
+    this.audio.loop = false;
+    var self = this;
+    this.audio.addEventListener('ended', function() {
+      self.next();
+    });
+    this.audio.addEventListener('error', function() {
+      console.warn('⚠️ ملف الراديو مش موجود: ' + self.audio.src);
+    });
+  },
+  
+  play: function() {
+    if (!this.audio) return;
+    var track = RADIO_TRACKS[this.currentTrack];
+    this.audio.src = track.file;
+    this.audio.play().then(function() {
+      console.log('📻 شغال: ' + track.name);
+    }).catch(function(e) {
+      console.warn('⚠️ مش قادر أشغل الراديو:', e.message);
+    });
+    this.isPlaying = true;
+    if (UI.radioTrack) UI.radioTrack.textContent = track.name;
+    if (UI.radioToggle) UI.radioToggle.textContent = '⏸️';
+  },
+  
+  pause: function() {
+    if (this.audio) this.audio.pause();
+    this.isPlaying = false;
+    if (UI.radioToggle) UI.radioToggle.textContent = '▶️';
+  },
+  
+  toggle: function() {
+    if (this.isPlaying) this.pause();
+    else this.play();
+  },
+  
+  next: function() {
+    this.currentTrack = (this.currentTrack + 1) % RADIO_TRACKS.length;
+    if (this.isPlaying) this.play();
+    else if (UI.radioTrack) UI.radioTrack.textContent = RADIO_TRACKS[this.currentTrack].name;
+  },
+  
+  prev: function() {
+    this.currentTrack = (this.currentTrack - 1 + RADIO_TRACKS.length) % RADIO_TRACKS.length;
+    if (this.isPlaying) this.play();
+    else if (UI.radioTrack) UI.radioTrack.textContent = RADIO_TRACKS[this.currentTrack].name;
+  }
 };
 
 /* ============================================================
    المواد
    ============================================================ */
 var MAT = {
-  road: new THREE.MeshLambertMaterial({ color: 0x2a2a2a }),
+  // أرضية وشوارع
+  ground: new THREE.MeshLambertMaterial({ color: COLORS.ground }),
+  road: new THREE.MeshLambertMaterial({ color: COLORS.road }),
   roadLine: new THREE.MeshBasicMaterial({ color: 0xffcc00 }),
   roadLineWhite: new THREE.MeshBasicMaterial({ color: 0xffffff }),
-  sidewalk: new THREE.MeshLambertMaterial({ color: 0xa8a8a8 }),
-  ground: new THREE.MeshLambertMaterial({ color: COLORS.ground }),
-  canal: new THREE.MeshLambertMaterial({ color: COLORS.canal }),
+  sidewalk: new THREE.MeshLambertMaterial({ color: COLORS.sidewalk }),
+  sidewalkCurb: new THREE.MeshLambertMaterial({ color: 0x808080 }),
   
-  // مواد المباني الاحترافية
-  concrete: new THREE.MeshLambertMaterial({ color: 0xd8d0c0 }),
-  brick: new THREE.MeshLambertMaterial({ color: 0xb85c38 }),
-  brickDark: new THREE.MeshLambertMaterial({ color: 0x8b3a1f }),
+  // ترعة
+  canal: new THREE.MeshLambertMaterial({ color: COLORS.canal }),
+  canalBank: new THREE.MeshLambertMaterial({ color: 0x8b7355 }),
+  bridge: new THREE.MeshLambertMaterial({ color: 0x666666 }),
+  
+  // مباني - مواد احترافية
   plaster: new THREE.MeshLambertMaterial({ color: 0xf0e8d8 }),
   plasterPink: new THREE.MeshLambertMaterial({ color: 0xe8d0c0 }),
   plasterYellow: new THREE.MeshLambertMaterial({ color: 0xf0d898 }),
   plasterBlue: new THREE.MeshLambertMaterial({ color: 0xc8d8e8 }),
   plasterGreen: new THREE.MeshLambertMaterial({ color: 0xc8e0c0 }),
+  brick: new THREE.MeshLambertMaterial({ color: 0xb85c38 }),
+  brickDark: new THREE.MeshLambertMaterial({ color: 0x8b3a1f }),
+  concrete: new THREE.MeshLambertMaterial({ color: 0xd8d0c0 }),
   tiles: new THREE.MeshLambertMaterial({ color: 0x8b6a4a }),
   tilesRed: new THREE.MeshLambertMaterial({ color: 0xa85040 }),
   metalDoor: new THREE.MeshLambertMaterial({ color: 0x4a4a4a }),
@@ -289,7 +375,10 @@ var MAT = {
   balconyRail: new THREE.MeshLambertMaterial({ color: 0x4a4a4a }),
   acUnit: new THREE.MeshLambertMaterial({ color: 0xd0d0d0 }),
   satellite: new THREE.MeshLambertMaterial({ color: 0xc0c0c0 }),
+  glass: new THREE.MeshLambertMaterial({ color: 0x88ccff, transparent: true, opacity: 0.5 }),
+  window: new THREE.MeshLambertMaterial({ color: 0x88ccff }),
   
+  // ألوان لافتات المحلات
   shopAwning: [
     new THREE.MeshLambertMaterial({ color: 0xe74c3c }),
     new THREE.MeshLambertMaterial({ color: 0x3498db }),
@@ -298,7 +387,6 @@ var MAT = {
     new THREE.MeshLambertMaterial({ color: 0x9b59b6 }),
     new THREE.MeshLambertMaterial({ color: 0x1abc9c }),
   ],
-  
   buildingWalls: [
     new THREE.MeshLambertMaterial({ color: 0xd4a574 }),
     new THREE.MeshLambertMaterial({ color: 0xc9a878 }),
@@ -311,23 +399,25 @@ var MAT = {
     new THREE.MeshLambertMaterial({ color: 0x6a5a4a }),
   ],
   
-  window: new THREE.MeshLambertMaterial({ color: 0x88ccff }),
-  door: new THREE.MeshLambertMaterial({ color: 0x5a3a1a }),
-  
+  // أشجار
   treeTrunk: new THREE.MeshLambertMaterial({ color: 0x5a3a20 }),
   treeLeaf: new THREE.MeshLambertMaterial({ color: 0x3a7a3a }),
+  treeLeafDark: new THREE.MeshLambertMaterial({ color: 0x2a5a2a }),
   palmTrunk: new THREE.MeshLambertMaterial({ color: 0x8b6a3a }),
   palmLeaf: new THREE.MeshLambertMaterial({ color: 0x3a8a3a, side: THREE.DoubleSide }),
   
+  // سيارات
   carBody: [
     new THREE.MeshLambertMaterial({ color: 0xcc3333 }),
     new THREE.MeshLambertMaterial({ color: 0x3366cc }),
     new THREE.MeshLambertMaterial({ color: 0xcccccc }),
     new THREE.MeshLambertMaterial({ color: 0x333333 }),
     new THREE.MeshLambertMaterial({ color: 0xf39c12 }),
+    new THREE.MeshLambertMaterial({ color: 0x1abc9c }),
   ],
   carTire: new THREE.MeshLambertMaterial({ color: 0x1a1a1a }),
   
+  // ناس واقعية - ألوان ملابس
   peopleShirt: [
     new THREE.MeshLambertMaterial({ color: 0xe74c3c }),
     new THREE.MeshLambertMaterial({ color: 0x3498db }),
@@ -335,110 +425,157 @@ var MAT = {
     new THREE.MeshLambertMaterial({ color: 0xf39c12 }),
     new THREE.MeshLambertMaterial({ color: 0x9b59b6 }),
     new THREE.MeshLambertMaterial({ color: 0x1abc9c }),
+    new THREE.MeshLambertMaterial({ color: 0xe67e22 }),
+    new THREE.MeshLambertMaterial({ color: 0xffffff }),
+    new THREE.MeshLambertMaterial({ color: 0x2c3e50 }),
+    new THREE.MeshLambertMaterial({ color: 0xffd700 }),
+    new THREE.MeshLambertMaterial({ color: 0x8e44ad }),
+    new THREE.MeshLambertMaterial({ color: 0xd35400 }),
   ],
   peoplePants: [
     new THREE.MeshLambertMaterial({ color: 0x2c3e50 }),
     new THREE.MeshLambertMaterial({ color: 0x1a1a1a }),
     new THREE.MeshLambertMaterial({ color: 0x34495e }),
+    new THREE.MeshLambertMaterial({ color: 0x4a4a4a }),
+    new THREE.MeshLambertMaterial({ color: 0x5a3a2a }),
+    new THREE.MeshLambertMaterial({ color: 0x1e3799 }),
   ],
   peopleSkin: [
     new THREE.MeshLambertMaterial({ color: 0xf5d5b0 }),
     new THREE.MeshLambertMaterial({ color: 0xe0b890 }),
     new THREE.MeshLambertMaterial({ color: 0xc89870 }),
+    new THREE.MeshLambertMaterial({ color: 0xa87850 }),
+    new THREE.MeshLambertMaterial({ color: 0x8d5524 }),
+  ],
+  peopleHair: [
+    new THREE.MeshLambertMaterial({ color: 0x1a1a1a }),
+    new THREE.MeshLambertMaterial({ color: 0x3a2a1a }),
+    new THREE.MeshLambertMaterial({ color: 0x5a4a3a }),
+    new THREE.MeshLambertMaterial({ color: 0x808080 }),
   ],
   
+  // معالم
   mosqueWall: new THREE.MeshLambertMaterial({ color: 0xf0e8d0 }),
   mosqueDome: new THREE.MeshLambertMaterial({ color: 0x16a085 }),
   mosqueGold: new THREE.MeshLambertMaterial({ color: 0xffcc00 }),
   stationWall: new THREE.MeshLambertMaterial({ color: 0xe8dcc0 }),
   stationRoof: new THREE.MeshLambertMaterial({ color: 0x8b4513 }),
   factoryWall: new THREE.MeshLambertMaterial({ color: 0x95a5a6 }),
+  factoryChimney: new THREE.MeshLambertMaterial({ color: 0x7f8c8d }),
   hospitalWall: new THREE.MeshLambertMaterial({ color: 0xf5f5f5 }),
-  hospitalRed: new THREE.MeshLambertMaterial({ color: 0xcc0000 }),
+  hospitalRed: new THREE.MeshBasicMaterial({ color: 0xcc0000 }),
   schoolWall: new THREE.MeshLambertMaterial({ color: 0xf0c880 }),
   
+  // توك توك
   black: new THREE.MeshLambertMaterial({ color: 0x0a0a0a }),
   yellow: new THREE.MeshLambertMaterial({ color: 0xffc800 }),
+  yellowDark: new THREE.MeshLambertMaterial({ color: 0xe6a800 }),
   chrome: new THREE.MeshLambertMaterial({ color: 0xcccccc }),
-  glass: new THREE.MeshLambertMaterial({ 
-    color: 0xaaddff, transparent: true, opacity: 0.4 
-  }),
+  glassTint: new THREE.MeshLambertMaterial({ color: 0xaaddff, transparent: true, opacity: 0.4 }),
   headlight: new THREE.MeshBasicMaterial({ color: 0xffffcc }),
   taillight: new THREE.MeshBasicMaterial({ color: 0xff2222 }),
   
-  // إشارات المرور
+  // إشارات
+  trafficPole: new THREE.MeshLambertMaterial({ color: 0x333333 }),
   trafficRed: new THREE.MeshBasicMaterial({ color: 0xff0000 }),
   trafficYellow: new THREE.MeshBasicMaterial({ color: 0xffcc00 }),
   trafficGreen: new THREE.MeshBasicMaterial({ color: 0x00ff00 }),
   trafficOff: new THREE.MeshLambertMaterial({ color: 0x333333 }),
-  trafficPole: new THREE.MeshLambertMaterial({ color: 0x333333 }),
   
-  // اللجنة الأمنية
+  // لجنة
   policeShirt: new THREE.MeshLambertMaterial({ color: 0x1a1a3a }),
   policePants: new THREE.MeshLambertMaterial({ color: 0x1a1a1a }),
   policeCap: new THREE.MeshLambertMaterial({ color: 0x1a1a3a }),
   policeBadge: new THREE.MeshBasicMaterial({ color: 0xffcc00 }),
+  
+  // قهاوي
+  cafeTable: new THREE.MeshLambertMaterial({ color: 0x8b6a3a }),
+  cafeChair: new THREE.MeshLambertMaterial({ color: 0x5a3a1a }),
+  cafeShisha: new THREE.MeshLambertMaterial({ color: 0xc8a878 }),
+  cafeShishaTop: new THREE.MeshLambertMaterial({ color: 0x8b6a3a }),
+  cafeGlass: new THREE.MeshLambertMaterial({ color: 0xf0e8d0, transparent: true, opacity: 0.7 }),
+  cafeAwning: new THREE.MeshLambertMaterial({ color: 0xd4a574 }),
 };
 
 /* ============================================================
-   Texture للنصوص
+   نصوص الشوارع (Canvas Texture)
    ============================================================ */
-function makeTextTexture(text, bgColor) {
+function makeTextTexture(text, bgColor, textColor, w, h) {
+  w = w || 640;
+  h = h || 160;
+  bgColor = bgColor || '#1a5a9a';
+  textColor = textColor || '#ffffff';
+  
   var canvas = document.createElement('canvas');
-  canvas.width = 512;
-  canvas.height = 128;
+  canvas.width = w;
+  canvas.height = h;
   var ctx = canvas.getContext('2d');
   
-  ctx.fillStyle = bgColor || '#1a5a9a';
-  ctx.fillRect(0, 0, 512, 128);
+  // خلفية متدرجة
+  var grad = ctx.createLinearGradient(0, 0, 0, h);
+  grad.addColorStop(0, bgColor);
+  grad.addColorStop(1, '#000');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, w, h);
   
+  // حدود
   ctx.strokeStyle = '#ffffff';
-  ctx.lineWidth = 6;
-  ctx.strokeRect(6, 6, 500, 116);
+  ctx.lineWidth = 8;
+  ctx.strokeRect(8, 8, w - 16, h - 16);
   
-  ctx.fillStyle = '#ffffff';
-  ctx.font = 'bold 50px Tahoma, Arial';
+  // نص
+  ctx.fillStyle = textColor;
+  ctx.font = 'bold 62px Tahoma, Arial';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText(text, 256, 64);
+  ctx.fillText(text, w / 2, h / 2);
   
-  return new THREE.CanvasTexture(canvas);
+  var tex = new THREE.CanvasTexture(canvas);
+  tex.anisotropy = 4;
+  return tex;
 }
 
 /* ============================================================
-   الشوارع
+   📍 الشوارع الحقيقية لكفر الدوار
    ============================================================ */
 var ROADS_DATA = [
-  { name: 'شارع أحمد عرابي', x: 0, z: -15, width: 20, length: 1200, rotation: 0, isMain: true },
-  { name: 'شارع بورسعيد', x: 0, z: 25, width: 17, length: 1200, rotation: 0 },
-  { name: 'شارع الجيش', x: 250, z: 100, width: 17, length: 600, rotation: Math.PI / 2 },
-  { name: 'شارع الجمهورية', x: -300, z: 0, width: 15, length: 550, rotation: Math.PI / 2 },
-  { name: 'شارع جلال الدسوقي', x: -100, z: 350, width: 14, length: 450, rotation: Math.PI / 2 },
-  { name: 'شارع سيدي عبد القادر', x: -480, z: 100, width: 15, length: 400, rotation: Math.PI / 2 },
-  { name: 'شارع الحدائق', x: 100, z: 300, width: 13, length: 400, rotation: Math.PI / 2 },
-  { name: 'شارع المحور', x: 450, z: 250, width: 13, length: 400, rotation: Math.PI / 2 },
-  { name: 'شارع الجلاء', x: -400, z: -220, width: 14, length: 450, rotation: 0 },
-  { name: 'شارع النصر', x: 350, z: -220, width: 14, length: 450, rotation: 0 },
-  { name: 'شارع المحكمة', x: -220, z: -260, width: 13, length: 350, rotation: Math.PI / 2 },
-  { name: 'شارع الموقف', x: 600, z: 0, width: 13, length: 450, rotation: Math.PI / 2 },
+  // الشوارع الرئيسية (طولية - شمال/جنوب)
+  { name: 'شارع أحمد عرابي', x: 0, z: -15, width: 22, length: 1300, rotation: 0, isMain: true, signColor: '#1a5a9a' },
+  { name: 'شارع بورسعيد', x: 0, z: 30, width: 18, length: 1300, rotation: 0, signColor: '#8b1a1a' },
+  
+  // الشوارع العرضية (شرق/غرب)
+  { name: 'شارع الجيش', x: 280, z: 120, width: 18, length: 650, rotation: Math.PI / 2, signColor: '#1a8a3a' },
+  { name: 'شارع الجمهورية', x: -320, z: 0, width: 16, length: 600, rotation: Math.PI / 2, signColor: '#8a1a8a' },
+  { name: 'شارع جلال الدسوقي', x: -100, z: 380, width: 15, length: 500, rotation: Math.PI / 2, signColor: '#8a6a1a' },
+  { name: 'شارع سيدي عبد القادر', x: -520, z: 120, width: 16, length: 450, rotation: Math.PI / 2, signColor: '#1a8a8a' },
+  { name: 'شارع الحدائق', x: 120, z: 330, width: 14, length: 450, rotation: Math.PI / 2, signColor: '#3a8a1a' },
+  { name: 'شارع المحور', x: 480, z: 280, width: 14, length: 450, rotation: Math.PI / 2, signColor: '#8a3a1a' },
+  
+  // شوارع فرعية
+  { name: 'شارع الجلاء', x: -420, z: -240, width: 14, length: 500, rotation: 0, signColor: '#1a3a8a' },
+  { name: 'شارع النصر', x: 380, z: -240, width: 14, length: 500, rotation: 0, signColor: '#8a1a1a' },
+  { name: 'شارع المحكمة', x: -240, z: -280, width: 13, length: 400, rotation: Math.PI / 2, signColor: '#5a5a5a' },
+  { name: 'شارع الموقف', x: 650, z: 0, width: 13, length: 500, rotation: Math.PI / 2, signColor: '#8a5a1a' },
+  { name: 'شارع سعد زغلول', x: -650, z: -100, width: 13, length: 400, rotation: Math.PI / 2, signColor: '#6a3a8a' },
+  { name: 'شارع التحرير', x: 250, z: 500, width: 13, length: 400, rotation: 0, signColor: '#3a6a8a' },
 ];
 
 /* ============================================================
-   الوجهات
+   📍 الوجهات الحقيقية
    ============================================================ */
 var DESTINATIONS_DATA = [
-  { name: 'محطة قطار كفر الدوار', x: -220, z: -60, color: 0x8b4513 },
-  { name: 'مسجد الثورة', x: -100, z: 180, color: 0x16a085 },
-  { name: 'شركة مصر للغزل والنسيج', x: 350, z: -260, color: 0x95a5a6 },
-  { name: 'موقف عزيز المصري', x: 160, z: 60, color: 0xe74c3c },
-  { name: 'مجمع الميزانة', x: -130, z: -70, color: 0xf39c12 },
-  { name: 'مجمع السعرانية', x: 350, z: 90, color: 0xe67e22 },
-  { name: 'مستشفى كفر الدوار العام', x: -480, z: 130, color: 0x3498db },
-  { name: 'سوق الأربعاء', x: 90, z: 160, color: 0x9b59b6 },
-  { name: 'كورنيش ترعة المحمودية', x: 480, z: -18, color: 0x2980b9 },
-  { name: 'جامعة كفر الدوار', x: -400, z: -250, color: 0x8e44ad },
-  { name: 'مدرسة صلاح سالم', x: -240, z: 300, color: 0xf39c12 },
-  { name: 'شارع الجيش التجاري', x: 270, z: 180, color: 0xe74c3c },
+  { name: 'محطة قطار كفر الدوار', short: 'محطة القطار', x: -230, z: -80, color: 0x8b4513 },
+  { name: 'مسجد الثورة', short: 'المسجد', x: -120, z: 200, color: 0x16a085 },
+  { name: 'شركة مصر للغزل والنسيج', short: 'شركة الغزل', x: 380, z: -280, color: 0x95a5a6 },
+  { name: 'موقف عزيز المصري', short: 'الموقف', x: 170, z: 70, color: 0xe74c3c },
+  { name: 'مجمع الميزانة', short: 'الميزانة', x: -140, z: -100, color: 0xf39c12 },
+  { name: 'مجمع السعرانية', short: 'السعرانية', x: 380, z: 100, color: 0xe67e22 },
+  { name: 'مستشفى كفر الدوار العام', short: 'المستشفى', x: -520, z: 150, color: 0x3498db },
+  { name: 'سوق الأربعاء', short: 'السوق', x: 100, z: 180, color: 0x9b59b6 },
+  { name: 'كورنيش ترعة المحمودية', short: 'الكورنيش', x: 520, z: -20, color: 0x2980b9 },
+  { name: 'جامعة كفر الدوار', short: 'الجامعة', x: -420, z: -280, color: 0x8e44ad },
+  { name: 'مدرسة صلاح سالم', short: 'المدرسة', x: -260, z: 340, color: 0xf39c12 },
+  { name: 'شارع الجيش التجاري', short: 'الجيش', x: 300, z: 200, color: 0xe74c3c },
 ];
 
 /* ============================================================
@@ -539,72 +676,120 @@ function createGround() {
 }
 
 /* ============================================================
-   الترعة
+   ترعة المحمودية
    ============================================================ */
 var canalRef = null;
 function createCanal() {
   var group = new THREE.Group();
+  group.name = 'canal';
   
+  // الماء
   var water = new THREE.Mesh(
-    new THREE.PlaneGeometry(CONFIG.citySize * 1.4, CONFIG.canalWidth),
+    new THREE.PlaneGeometry(CONFIG.citySize * 1.5, CONFIG.canalWidth),
     MAT.canal
   );
   water.rotation.x = -Math.PI / 2;
   water.position.y = -0.35;
   group.add(water);
+  group.userData.water = water;
   
+  // الضفاف
   for (var s = -1; s <= 1; s += 2) {
     var bank = new THREE.Mesh(
-      new THREE.BoxGeometry(CONFIG.citySize * 1.4, 1.5, 3),
-      new THREE.MeshLambertMaterial({ color: 0x8b7355 })
+      new THREE.BoxGeometry(CONFIG.citySize * 1.5, 1.5, 3),
+      MAT.canalBank
     );
     bank.position.set(0, 0.6, s * (CONFIG.canalWidth / 2 + 1.5));
     group.add(bank);
+    
+    // سور حماية
+    var rail = new THREE.Mesh(
+      new THREE.BoxGeometry(CONFIG.citySize * 1.5, 0.8, 0.15),
+      MAT.chrome
+    );
+    rail.position.set(0, 2.0, s * (CONFIG.canalWidth / 2 + 3));
+    group.add(rail);
   }
   
+  // الجسر (شارع أحمد عرابي)
   var bridge = new THREE.Mesh(
-    new THREE.BoxGeometry(24, 2, CONFIG.canalWidth + 14),
-    new THREE.MeshLambertMaterial({ color: 0x555555 })
+    new THREE.BoxGeometry(26, 2.5, CONFIG.canalWidth + 16),
+    MAT.bridge
   );
-  bridge.position.set(0, 1.2, 0);
+  bridge.position.set(0, 1.5, 0);
   group.add(bridge);
+  
+  // درابزين الجسر
+  for (var s = -1; s <= 1; s += 2) {
+    var brail = new THREE.Mesh(
+      new THREE.BoxGeometry(1.5, 1, CONFIG.canalWidth + 16),
+      MAT.chrome
+    );
+    brail.position.set(s * 12, 3.2, 0);
+    group.add(brail);
+  }
   
   scene.add(group);
   canalRef = group;
 }
 
 /* ============================================================
-   الشوارع + لافتات + إشارات مرور + لجان
+   الشوارع الاحترافية + لافتات الأسماء
    ============================================================ */
 function createRoads() {
   var group = new THREE.Group();
+  group.name = 'roads';
   
   for (var i = 0; i < ROADS_DATA.length; i++) {
     var rd = ROADS_DATA[i];
     
-    var road = new THREE.Mesh(new THREE.BoxGeometry(rd.width, 0.15, rd.length), MAT.road);
+    // جسم الشارع
+    var road = new THREE.Mesh(
+      new THREE.BoxGeometry(rd.width, 0.15, rd.length),
+      MAT.road
+    );
     road.position.set(rd.x, 0.05, rd.z);
     road.rotation.y = rd.rotation;
     group.add(road);
     
+    // الأرصفة + حواف
     for (var s = -1; s <= 1; s += 2) {
+      var so = s * (rd.width / 2 + CONFIG.sidewalkWidth / 2);
+      var dx = Math.cos(rd.rotation) * so;
+      var dz = -Math.sin(rd.rotation) * so;
+      
+      // الرصيف
       var sidewalk = new THREE.Mesh(
         new THREE.BoxGeometry(CONFIG.sidewalkWidth, 0.3, rd.length),
         MAT.sidewalk
       );
-      var so = s * (rd.width / 2 + CONFIG.sidewalkWidth / 2);
-      var dx = Math.cos(rd.rotation) * so;
-      var dz = -Math.sin(rd.rotation) * so;
-      sidewalk.position.set(rd.x + dx, 0.15, rd.z + dz);
+      sidewalk.position.set(rd.x + dx, 0.2, rd.z + dz);
       sidewalk.rotation.y = rd.rotation;
       group.add(sidewalk);
+      
+      // حاجز الرصيف
+      var curbOffset = s * (rd.width / 2);
+      var cdx = Math.cos(rd.rotation) * curbOffset;
+      var cdz = -Math.sin(rd.rotation) * curbOffset;
+      
+      var curb = new THREE.Mesh(
+        new THREE.BoxGeometry(0.3, 0.35, rd.length),
+        MAT.sidewalkCurb
+      );
+      curb.position.set(rd.x + cdx, 0.18, rd.z + cdz);
+      curb.rotation.y = rd.rotation;
+      group.add(curb);
     }
     
+    // خطوط الطريق
     if (rd.width >= 15) {
-      var mc = Math.floor(rd.length / 30);
-      for (var j = 0; j < mc; j++) {
+      var lineCount = Math.floor(rd.length / 30);
+      for (var j = 0; j < lineCount; j++) {
         var off = -rd.length / 2 + j * 30 + 15;
-        var mark = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.05, 8), MAT.roadLine);
+        var mark = new THREE.Mesh(
+          new THREE.BoxGeometry(0.4, 0.05, 10),
+          MAT.roadLine
+        );
         var mx = rd.x + Math.sin(rd.rotation) * off;
         var mz = rd.z + Math.cos(rd.rotation) * off;
         mark.position.set(mx, 0.15, mz);
@@ -613,254 +798,56 @@ function createRoads() {
       }
     }
     
-    // لوحة اسم الشارع
+    // لوحة اسم الشارع (احترافية)
     if (rd.isMain || rd.width >= 15) {
-      var signTex = makeTextTexture(rd.name, '#1a5a9a');
+      var signTex = makeTextTexture(rd.name, rd.signColor, '#ffffff', 700, 160);
       var signMat = new THREE.MeshBasicMaterial({ map: signTex, side: THREE.DoubleSide });
-      var sign = new THREE.Mesh(new THREE.PlaneGeometry(8, 2), signMat);
+      var signGeo = new THREE.PlaneGeometry(9, 2.2);
       
-      var signOffset = rd.width / 2 + 1.5;
+      // اللوحة الأولى
+      var signOffset = rd.width / 2 + 2;
       var signX = rd.x + Math.cos(rd.rotation) * signOffset;
       var signZ = rd.z - Math.sin(rd.rotation) * signOffset;
+      var posAlong = rd.length / 4;
+      signX += Math.sin(rd.rotation) * posAlong;
+      signZ += Math.cos(rd.rotation) * posAlong;
       
-      var signPosOffset = rd.length / 4;
-      signX += Math.sin(rd.rotation) * signPosOffset;
-      signZ += Math.cos(rd.rotation) * signPosOffset;
-      
+      // عمود اللوحة
       var pole = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.08, 0.08, 6),
+        new THREE.CylinderGeometry(0.1, 0.1, 7),
         MAT.chrome
       );
-      pole.position.set(signX, 3, signZ);
+      pole.position.set(signX, 3.5, signZ);
       group.add(pole);
       
-      sign.position.set(signX, 5.8, signZ);
+      // اللوحة
+      var sign = new THREE.Mesh(signGeo, signMat);
+      sign.position.set(signX, 6.5, signZ);
       group.add(sign);
-    }
-  }
-  
-  scene.add(group);
-}
-
-/* ============================================================
-   🚦 إشارات المرور
-   ============================================================ */
-var trafficLights = [];
-
-function createTrafficLight(x, z, rotation) {
-  var g = new THREE.Group();
-  
-  // العمود
-  var pole = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.12, 0.12, 6, 8),
-    MAT.trafficPole
-  );
-  pole.position.y = 3;
-  g.add(pole);
-  
-  // الصندوق
-  var box = new THREE.Mesh(
-    new THREE.BoxGeometry(0.7, 2, 0.5),
-    MAT.trafficPole
-  );
-  box.position.y = 6.5;
-  g.add(box);
-  
-  // اللمبات
-  var redLight = new THREE.Mesh(new THREE.CircleGeometry(0.22, 12), MAT.trafficRed);
-  redLight.position.set(0, 7.2, 0.26);
-  g.add(redLight);
-  
-  var yellowLight = new THREE.Mesh(new THREE.CircleGeometry(0.22, 12), MAT.trafficOff);
-  yellowLight.position.set(0, 6.5, 0.26);
-  g.add(yellowLight);
-  
-  var greenLight = new THREE.Mesh(new THREE.CircleGeometry(0.22, 12), MAT.trafficOff);
-  greenLight.position.set(0, 5.8, 0.26);
-  g.add(greenLight);
-  
-  g.position.set(x, 0, z);
-  g.rotation.y = rotation;
-  
-  g.userData = {
-    redLight: redLight,
-    yellowLight: yellowLight,
-    greenLight: greenLight,
-    state: 0, // 0=red, 1=yellow, 2=green
-    timer: Math.random() * 10,
-  };
-  
-  return g;
-}
-
-function createTrafficLights() {
-  var group = new THREE.Group();
-  
-  // إشارات في التقاطعات الرئيسية
-  var intersections = [
-    { x: 20, z: -15, r: 0 },
-    { x: -20, z: -15, r: Math.PI },
-    { x: 20, z: 25, r: 0 },
-    { x: 250, z: 100, r: 0 },
-    { x: -300, z: 0, r: Math.PI / 2 },
-    { x: 100, z: 300, r: 0 },
-  ];
-  
-  for (var i = 0; i < intersections.length; i++) {
-    var tl = createTrafficLight(intersections[i].x, intersections[i].z, intersections[i].r);
-    group.add(tl);
-    trafficLights.push(tl);
-  }
-  
-  scene.add(group);
-}
-
-function updateTrafficLights(dt) {
-  for (var i = 0; i < trafficLights.length; i++) {
-    var tl = trafficLights[i];
-    var ud = tl.userData;
-    
-    ud.timer -= dt;
-    if (ud.timer <= 0) {
-      ud.state = (ud.state + 1) % 3;
-      if (ud.state === 0) ud.timer = 6;      // أحمر 6 ثواني
-      else if (ud.state === 1) ud.timer = 2; // أصفر 2 ثانية
-      else ud.timer = 6;                     // أخضر 6 ثواني
       
-      // تحديث اللمبات
-      ud.redLight.material = ud.state === 0 ? MAT.trafficRed : MAT.trafficOff;
-      ud.yellowLight.material = ud.state === 1 ? MAT.trafficYellow : MAT.trafficOff;
-      ud.greenLight.material = ud.state === 2 ? MAT.trafficGreen : MAT.trafficOff;
+      // لوحة ثانية في النصف الآخر (للشوارع الطويلة)
+      if (rd.length > 500) {
+        var signX2 = rd.x - Math.cos(rd.rotation) * signOffset;
+        var signZ2 = rd.z + Math.sin(rd.rotation) * signOffset;
+        var posAlong2 = -rd.length / 4;
+        signX2 += Math.sin(rd.rotation) * posAlong2;
+        signZ2 += Math.cos(rd.rotation) * posAlong2;
+        
+        var pole2 = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.1, 0.1, 7),
+          MAT.chrome
+        );
+        pole2.position.set(signX2, 3.5, signZ2);
+        group.add(pole2);
+        
+        var sign2 = new THREE.Mesh(signGeo, signMat);
+        sign2.position.set(signX2, 6.5, signZ2);
+        group.add(sign2);
+      }
     }
-  }
-}
-
-/* ============================================================
-   👮 اللجان الأمنية
-   ============================================================ */
-var policeCheckpoints = [];
-
-function createPoliceCheckpoint(x, z, rotation) {
-  var g = new THREE.Group();
-  
-  // الكونة (المخروط)
-  for (var i = 0; i < 5; i++) {
-    var cone = new THREE.Mesh(
-      new THREE.ConeGeometry(0.25, 0.7, 8),
-      new THREE.MeshLambertMaterial({ color: 0xff6600 })
-    );
-    cone.position.set(Utils.rand(-2, 2), 0.35, Utils.rand(-0.5, 0.5));
-    g.add(cone);
-  }
-  
-  // شريط أحمر وأبيض
-  var barrier = new THREE.Mesh(
-    new THREE.BoxGeometry(4, 0.15, 0.15),
-    new THREE.MeshLambertMaterial({ color: 0xffffff })
-  );
-  barrier.position.y = 1;
-  g.add(barrier);
-  
-  for (var i = -1; i <= 1; i += 2) {
-    var post = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.08, 0.08, 2),
-      MAT.trafficPole
-    );
-    post.position.set(i * 2, 1, 0);
-    g.add(post);
-  }
-  
-  // الظابط
-  var officer = new THREE.Group();
-  
-  // الجسم
-  var torso = new THREE.Mesh(
-    new THREE.BoxGeometry(0.5, 0.7, 0.3),
-    MAT.policeShirt
-  );
-  torso.position.y = 1.15;
-  officer.add(torso);
-  
-  // الرأس
-  var head = new THREE.Mesh(
-    new THREE.SphereGeometry(0.16, 8, 8),
-    MAT.peopleSkin[0]
-  );
-  head.position.y = 1.65;
-  officer.add(head);
-  
-  // الكاب
-  var cap = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.18, 0.18, 0.12, 8),
-    MAT.policeCap
-  );
-  cap.position.y = 1.78;
-  officer.add(cap);
-  
-  // الشارة الذهبية
-  var badge = new THREE.Mesh(
-    new THREE.BoxGeometry(0.08, 0.08, 0.02),
-    MAT.policeBadge
-  );
-  badge.position.set(0.15, 1.35, 0.16);
-  officer.add(badge);
-  
-  // البنطلون
-  var pants = new THREE.Mesh(
-    new THREE.BoxGeometry(0.5, 0.8, 0.3),
-    MAT.policePants
-  );
-  pants.position.y = 0.4;
-  officer.add(pants);
-  
-  // الذراعين
-  var armGeo = new THREE.BoxGeometry(0.14, 0.6, 0.14);
-  var armL = new THREE.Mesh(armGeo, MAT.policeShirt);
-  armL.position.set(-0.32, 1.15, 0);
-  officer.add(armL);
-  
-  var armR = new THREE.Mesh(armGeo, MAT.policeShirt);
-  armR.position.set(0.32, 1.15, 0);
-  officer.add(armR);
-  
-  officer.position.set(1.5, 0, 0);
-  g.add(officer);
-  
-  g.position.set(x, 0, z);
-  g.rotation.y = rotation;
-  g.userData = { officer: officer, armR: armR };
-  
-  return g;
-}
-
-function createPoliceCheckpoints() {
-  var group = new THREE.Group();
-  
-  var checkpoints = [
-    { x: -100, z: -15, r: 0 },
-    { x: 150, z: -15, r: 0 },
-    { x: 0, z: 100, r: Math.PI / 2 },
-    { x: -300, z: 100, r: 0 },
-  ];
-  
-  for (var i = 0; i < checkpoints.length; i++) {
-    var cp = createPoliceCheckpoint(checkpoints[i].x, checkpoints[i].z, checkpoints[i].r);
-    group.add(cp);
-    policeCheckpoints.push(cp);
   }
   
   scene.add(group);
-}
-
-function updatePoliceCheckpoints(dt) {
-  for (var i = 0; i < policeCheckpoints.length; i++) {
-    var cp = policeCheckpoints[i];
-    var ud = cp.userData;
-    // الظابط بيحرك إيده
-    if (ud.armR) {
-      ud.armR.rotation.x = Math.sin(performance.now() * 0.002) * 0.5;
-    }
-  }
 }
 
 /* ============================================================
@@ -868,11 +855,14 @@ function updatePoliceCheckpoints(dt) {
    ============================================================ */
 function createRailway() {
   var group = new THREE.Group();
-  var railX = -250;
+  var railX = -260;
   var railMat = new THREE.MeshLambertMaterial({ color: 0x808080 });
   
   for (var s = -1; s <= 1; s += 2) {
-    var rail = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.3, CONFIG.citySize), railMat);
+    var rail = new THREE.Mesh(
+      new THREE.BoxGeometry(0.15, 0.3, CONFIG.citySize),
+      railMat
+    );
     rail.position.set(railX + s * 1.2, 0.35, 0);
     group.add(rail);
   }
@@ -888,15 +878,20 @@ function createTree(x, z, scale) {
   var t = new THREE.Group();
   
   var trunk = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.15 * scale, 0.22 * scale, 2.2 * scale, 5),
+    new THREE.CylinderGeometry(0.15 * scale, 0.22 * scale, 2.2 * scale, 6),
     MAT.treeTrunk
   );
   trunk.position.y = 1.1 * scale;
   t.add(trunk);
   
-  var leaf = new THREE.Mesh(new THREE.SphereGeometry(1.3 * scale, 6, 5), MAT.treeLeaf);
-  leaf.position.y = 2.9 * scale;
-  t.add(leaf);
+  var leafMat = Math.random() > 0.5 ? MAT.treeLeaf : MAT.treeLeafDark;
+  var leaf1 = new THREE.Mesh(new THREE.SphereGeometry(1.3 * scale, 7, 6), leafMat);
+  leaf1.position.y = 2.9 * scale;
+  t.add(leaf1);
+  
+  var leaf2 = new THREE.Mesh(new THREE.SphereGeometry(0.9 * scale, 6, 5), leafMat);
+  leaf2.position.set(0.5 * scale, 3.4 * scale, 0.3 * scale);
+  t.add(leaf2);
   
   t.position.set(x, 0, z);
   return t;
@@ -907,14 +902,14 @@ function createPalm(x, z, scale) {
   var p = new THREE.Group();
   
   var trunk = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.14 * scale, 0.2 * scale, 5.5 * scale, 6),
+    new THREE.CylinderGeometry(0.14 * scale, 0.2 * scale, 5.5 * scale, 7),
     MAT.palmTrunk
   );
   trunk.position.y = 2.75 * scale;
   p.add(trunk);
   
-  for (var i = 0; i < 6; i++) {
-    var angle = (i / 6) * Math.PI * 2;
+  for (var i = 0; i < 7; i++) {
+    var angle = (i / 7) * Math.PI * 2;
     var leaf = new THREE.Mesh(
       new THREE.PlaneGeometry(0.85 * scale, 3 * scale),
       MAT.palmLeaf
@@ -936,6 +931,7 @@ function createPalm(x, z, scale) {
 function createFoliage() {
   var group = new THREE.Group();
   
+  // نخيل على ضفاف الترعة
   var step = 40;
   for (var x = -CONFIG.citySize * 0.55; x < CONFIG.citySize * 0.55; x += step) {
     if (Math.random() > 0.5) {
@@ -946,18 +942,20 @@ function createFoliage() {
     }
   }
   
+  // أشجار على الشوارع
   var count = 0;
   for (var i = 0; i < ROADS_DATA.length && count < QUALITY.treeCount; i++) {
     var rd = ROADS_DATA[i];
-    if (rd.width < 13) continue;
-    var trees = Math.floor(rd.length / 70);
+    if (rd.width < 14) continue;
+    var treeSpacing = 65;
+    var trees = Math.floor(rd.length / treeSpacing);
     for (var j = 0; j < trees && count < QUALITY.treeCount; j++) {
-      var off = -rd.length / 2 + j * 70 + 35;
+      var off = -rd.length / 2 + j * treeSpacing + treeSpacing / 2;
       var s = Math.random() > 0.5 ? 1 : -1;
-      var so = s * (rd.width / 2 + CONFIG.sidewalkWidth + 1.5);
+      var so = s * (rd.width / 2 + CONFIG.sidewalkWidth + 2);
       var tx = rd.x + Math.sin(rd.rotation) * off + Math.cos(rd.rotation) * so;
       var tz = rd.z + Math.cos(rd.rotation) * off - Math.sin(rd.rotation) * so;
-      if (Math.abs(tz) > CONFIG.canalWidth / 2 + 7) {
+      if (Math.abs(tz) > CONFIG.canalWidth / 2 + 8) {
         group.add(createTree(tx, tz, Utils.rand(0.85, 1.15)));
         count++;
       }
@@ -968,1672 +966,37 @@ function createFoliage() {
 }
 
 /* ============================================================
-   المباني - احترافية ومتنوعة
+   ⚠️ سيتم استكمال باقي الدوال في الرد الجاي
    ============================================================ */
-function isOnRoad(x, z, pad) {
-  pad = pad || 0;
-  for (var i = 0; i < ROADS_DATA.length; i++) {
-    var r = ROADS_DATA[i];
-    var hw = r.width / 2 + CONFIG.sidewalkWidth + pad;
-    var hl = r.length / 2 + pad;
-    var dx = x - r.x, dz = z - r.z;
-    var c = Math.cos(-r.rotation), s = Math.sin(-r.rotation);
-    var lx = dx * c - dz * s, lz = dx * s + dz * c;
-    if (Math.abs(lx) < hw && Math.abs(lz) < hl) return true;
-  }
-  return false;
-}
 
-function createDetailedBuilding(x, z, w, d, h) {
-  var g = new THREE.Group();
-  var style = Math.floor(Math.random() * 4);
-  
-  var wallMat, roofMat, trimMat;
-  
-  if (style === 0) {
-    wallMat = Utils.pick([MAT.plaster, MAT.plasterPink, MAT.concrete]);
-    roofMat = MAT.tiles;
-    trimMat = MAT.concrete;
-  } else if (style === 1) {
-    wallMat = Utils.pick([MAT.plasterYellow, MAT.plasterBlue]);
-    roofMat = MAT.tilesRed;
-    trimMat = MAT.plaster;
-  } else if (style === 2) {
-    wallMat = Utils.pick([MAT.plasterGreen, MAT.plasterYellow]);
-    roofMat = MAT.tilesRed;
-    trimMat = MAT.plaster;
-  } else {
-    wallMat = Utils.pick([MAT.brick, MAT.brickDark, MAT.plaster]);
-    roofMat = MAT.tiles;
-    trimMat = MAT.concrete;
-  }
-  
-  // الدور الأرضي
-  var groundFloorH = 3.5;
-  var groundMat = style === 3 ? MAT.brickDark : wallMat;
-  
-  var groundFloor = new THREE.Mesh(
-    new THREE.BoxGeometry(w + 0.2, groundFloorH, d + 0.2),
-    groundMat
-  );
-  groundFloor.position.y = groundFloorH / 2;
-  g.add(groundFloor);
-  
-  // باقي الأدوار
-  var upperH = h - groundFloorH;
-  if (upperH > 0) {
-    var upperFloors = new THREE.Mesh(
-      new THREE.BoxGeometry(w, upperH, d),
-      wallMat
-    );
-    upperFloors.position.y = groundFloorH + upperH / 2;
-    g.add(upperFloors);
-  }
-  
-  // السقف
-  var roofBase = new THREE.Mesh(
-    new THREE.BoxGeometry(w + 0.5, 0.4, d + 0.5),
-    roofMat
-  );
-  roofBase.position.y = h + 0.2;
-  g.add(roofBase);
-  
-  // سور السطح
-  var parapetH = 0.7;
-  var parapetGeo = new THREE.BoxGeometry(0.2, parapetH, d + 0.5);
-  for (var s = -1; s <= 1; s += 2) {
-    var p1 = new THREE.Mesh(parapetGeo, trimMat);
-    p1.position.set(s * (w / 2 + 0.15), h + 0.6, 0);
-    g.add(p1);
-  }
-  var parapetGeo2 = new THREE.BoxGeometry(w + 0.5, parapetH, 0.2);
-  for (var s = -1; s <= 1; s += 2) {
-    var p2 = new THREE.Mesh(parapetGeo2, trimMat);
-    p2.position.set(0, h + 0.6, s * (d / 2 + 0.15));
-    g.add(p2);
-  }
-  
-  // واجهة المحل أو الباب
-  if (style === 1 || Math.random() > 0.5) {
-    var shopWin = new THREE.Mesh(
-      new THREE.BoxGeometry(w * 0.7, 2.2, 0.15),
-      MAT.glass
-    );
-    shopWin.position.set(0, 1.7, d / 2 + 0.12);
-    g.add(shopWin);
-    
-    var shopFrame = new THREE.Mesh(
-      new THREE.BoxGeometry(w * 0.75, 2.5, 0.1),
-      MAT.metalDoor
-    );
-    shopFrame.position.set(0, 1.7, d / 2 + 0.05);
-    g.add(shopFrame);
-    
-    var awningColor = Utils.pick(MAT.shopAwning);
-    var awning = new THREE.Mesh(
-      new THREE.BoxGeometry(w * 0.8, 0.15, 1.5),
-      awningColor
-    );
-    awning.position.set(0, 3.1, d / 2 + 0.7);
-    awning.rotation.x = -0.25;
-    g.add(awning);
-    
-    var signColor = Utils.pick([0xe74c3c, 0x3498db, 0xf39c12, 0x2ecc71, 0x9b59b6]);
-    var shopSign = new THREE.Mesh(
-      new THREE.BoxGeometry(w * 0.6, 0.8, 0.15),
-      new THREE.MeshLambertMaterial({ color: signColor })
-    );
-    shopSign.position.set(0, 3.6, d / 2 + 0.1);
-    g.add(shopSign);
-  } else {
-    var door = new THREE.Mesh(
-      new THREE.BoxGeometry(1.4, 2.5, 0.15),
-      style === 3 ? MAT.metalDoor : MAT.woodDoor
-    );
-    door.position.set(0, 1.25, d / 2 + 0.12);
-    g.add(door);
-    
-    var doorFrame = new THREE.Mesh(
-      new THREE.BoxGeometry(1.7, 2.8, 0.08),
-      trimMat
-    );
-    doorFrame.position.set(0, 1.4, d / 2 + 0.06);
-    g.add(doorFrame);
-  }
-  
-  // نوافذ الأدوار العلوية
-  var floors = Math.max(1, Math.floor((h - groundFloorH) / 3));
-  var winCols = Math.max(2, Math.floor(w / 3));
-  
-  for (var f = 0; f < floors; f++) {
-    var winY = groundFloorH + 1.5 + f * 3;
-    
-    for (var c = 0; c < winCols; c++) {
-      var winX = -w / 2 + 1.5 + c * (w / winCols);
-      
-      // نافذة أمامية
-      var winFrame = new THREE.Mesh(
-        new THREE.BoxGeometry(1.3, 1.6, 0.15),
-        trimMat
-      );
-      winFrame.position.set(winX, winY, d / 2 + 0.05);
-      g.add(winFrame);
-      
-      var winGlass = new THREE.Mesh(
-        new THREE.BoxGeometry(1, 1.3, 0.05),
-        MAT.window
-      );
-      winGlass.position.set(winX, winY, d / 2 + 0.12);
-      g.add(winGlass);
-      
-      // شرفة في بعض النوافذ
-      if (f > 0 && Math.random() > 0.7 && !isLowEnd) {
-        var balcony = new THREE.Mesh(
-          new THREE.BoxGeometry(1.8, 0.15, 1),
-          MAT.concrete
-        );
-        balcony.position.set(winX, winY - 0.9, d / 2 + 0.5);
-        g.add(balcony);
-        
-        var rail = new THREE.Mesh(
-          new THREE.BoxGeometry(1.8, 0.7, 0.08),
-          MAT.balconyRail
-        );
-        rail.position.set(winX, winY - 0.5, d / 2 + 0.95);
-        g.add(rail);
-        
-        // وحدة تكييف
-        if (Math.random() > 0.5) {
-          var ac = new THREE.Mesh(
-            new THREE.BoxGeometry(0.7, 0.5, 0.3),
-            MAT.acUnit
-          );
-          ac.position.set(winX - 0.6, winY - 1, d / 2 + 0.7);
-          g.add(ac);
-        }
-      }
-    }
-  }
-  
-  // طبق دش على السطح
-  if (Math.random() > 0.6 && !isLowEnd) {
-    var dish = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.5, 0.5, 0.1, 12),
-      MAT.satellite
-    );
-    dish.position.set(Utils.rand(-w / 3, w / 3), h + 0.8, Utils.rand(-d / 3, d / 3));
-    dish.rotation.z = Utils.rand(-0.3, 0.3);
-    g.add(dish);
-  }
-  
-  g.position.set(x, 0, z);
-  return g;
-}
-
-function createBuildings() {
-  var group = new THREE.Group();
-  var grid = 42;
-  var half = CONFIG.citySize / 2;
-  var buildingList = [];
-  
-  for (var gx = -half; gx < half; gx += grid) {
-    for (var gz = -half; gz < half; gz += grid) {
-      var x = gx + grid / 2 + Utils.rand(-2, 2);
-      var z = gz + grid / 2 + Utils.rand(-2, 2);
-      
-      if (isOnRoad(x, z, 4)) continue;
-      if (Math.abs(z) < CONFIG.canalWidth / 2 + 8) continue;
-      if (Math.abs(x + 250) < 15) continue;
-      if (Math.abs(x) < 18 && Math.abs(z) < 20) continue;
-      
-      var isNearLandmark = false;
-      for (var k = 0; k < DESTINATIONS_DATA.length; k++) {
-        var d = DESTINATIONS_DATA[k];
-        if (Math.abs(x - d.x) < 40 && Math.abs(z - d.z) < 40) {
-          isNearLandmark = true;
-          break;
-        }
-      }
-      if (isNearLandmark) continue;
-      
-      if (Math.random() > QUALITY.buildingDensity) continue;
-      if (buildingList.length >= QUALITY.maxBuildings) break;
-      
-      var w = Utils.rand(10, 16);
-      var d2 = Utils.rand(10, 16);
-      var h = Utils.rand(6, 18);
-      
-      buildingList.push({ x: x, z: z, w: w, d: d2, h: h });
-    }
-  }
-  
-  console.log('🏢 بناء', buildingList.length, 'مبنى احترافي...');
-  
-  // المباني المفصلة (القريبة)
-  var detailedCount = Math.min(QUALITY.detailedBuildings, buildingList.length);
-  
-  for (var i = 0; i < detailedCount; i++) {
-    var b = buildingList[i];
-    group.add(createDetailedBuilding(b.x, b.z, b.w, b.d, b.h));
-  }
-  
-  // الباقي - InstancedMesh للأداء
-  var simpleBuildings = buildingList.slice(detailedCount);
-  
-  if (simpleBuildings.length > 0) {
-    var boxGeo = new THREE.BoxGeometry(1, 1, 1);
-    var wallMats = [MAT.plaster, MAT.plasterPink, MAT.plasterYellow, 
-                    MAT.plasterBlue, MAT.plasterGreen, MAT.concrete];
-    
-    for (var c = 0; c < wallMats.length; c++) {
-      var filtered = [];
-      for (var i = 0; i < simpleBuildings.length; i++) {
-        if (i % wallMats.length === c) filtered.push(simpleBuildings[i]);
-      }
-      if (filtered.length === 0) continue;
-      
-      var instMesh = new THREE.InstancedMesh(boxGeo, wallMats[c], filtered.length);
-      var matrix = new THREE.Matrix4();
-      for (var i = 0; i < filtered.length; i++) {
-        var b = filtered[i];
-        matrix.makeScale(b.w, b.h, b.d);
-        matrix.setPosition(b.x, b.h / 2, b.z);
-        instMesh.setMatrixAt(i, matrix);
-      }
-      instMesh.instanceMatrix.needsUpdate = true;
-      group.add(instMesh);
-    }
-  }
-  
-  scene.add(group);
-}
-
-/* ============================================================
-   المعالم الحقيقية
-   ============================================================ */
-function createMosque(x, z) {
-  var g = new THREE.Group();
-  
-  var base = new THREE.Mesh(new THREE.BoxGeometry(18, 9, 18), MAT.mosqueWall);
-  base.position.y = 4.5;
-  g.add(base);
-  
-  var dome = new THREE.Mesh(
-    new THREE.SphereGeometry(5.5, 16, 12, 0, Math.PI * 2, 0, Math.PI / 2),
-    MAT.mosqueDome
-  );
-  dome.position.y = 9;
-  g.add(dome);
-  
-  var finial = new THREE.Mesh(new THREE.ConeGeometry(0.7, 2.5, 6), MAT.mosqueGold);
-  finial.position.y = 15;
-  g.add(finial);
-  
-  for (var s = -1; s <= 1; s += 2) {
-    var minaret = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 0.9, 20, 8), MAT.mosqueWall);
-    minaret.position.set(s * 10, 10, 0);
-    g.add(minaret);
-    
-    var mTop = new THREE.Mesh(new THREE.ConeGeometry(1.3, 3.5, 8), MAT.mosqueDome);
-    mTop.position.set(s * 10, 22, 0);
-    g.add(mTop);
-    
-    var mGold = new THREE.Mesh(new THREE.ConeGeometry(0.4, 1.5, 6), MAT.mosqueGold);
-    mGold.position.set(s * 10, 24.5, 0);
-    g.add(mGold);
-  }
-  
-  g.position.set(x, 0, z);
-  return g;
-}
-
-function createStation(x, z) {
-  var g = new THREE.Group();
-  
-  var main = new THREE.Mesh(new THREE.BoxGeometry(30, 8, 14), MAT.stationWall);
-  main.position.y = 4;
-  g.add(main);
-  
-  var roof = new THREE.Mesh(new THREE.BoxGeometry(32, 0.8, 16), MAT.stationRoof);
-  roof.position.y = 8.4;
-  g.add(roof);
-  
-  var tower = new THREE.Mesh(new THREE.BoxGeometry(4.5, 14, 4.5), MAT.stationWall);
-  tower.position.set(10, 11, 0);
-  g.add(tower);
-  
-  var towerRoof = new THREE.Mesh(new THREE.ConeGeometry(3.2, 4, 4), MAT.stationRoof);
-  towerRoof.position.set(10, 20, 0);
-  towerRoof.rotation.y = Math.PI / 4;
-  g.add(towerRoof);
-  
-  var clock = new THREE.Mesh(
-    new THREE.CircleGeometry(1.6, 20), 
-    new THREE.MeshBasicMaterial({ color: 0xffffff })
-  );
-  clock.position.set(10, 14, 2.4);
-  g.add(clock);
-  
-  g.position.set(x, 0, z);
-  return g;
-}
-
-function createFactory(x, z) {
-  var g = new THREE.Group();
-  
-  var main = new THREE.Mesh(new THREE.BoxGeometry(42, 14, 32), MAT.factoryWall);
-  main.position.y = 7;
-  g.add(main);
-  
-  for (var i = 0; i < 3; i++) {
-    var chimney = new THREE.Mesh(
-      new THREE.CylinderGeometry(1.6, 2, 28, 10),
-      new THREE.MeshLambertMaterial({ color: 0x7f8c8d })
-    );
-    chimney.position.set(-12 + i * 12, 21, -12);
-    g.add(chimney);
-    
-    var band = new THREE.Mesh(
-      new THREE.CylinderGeometry(1.7, 1.7, 1.2),
-      new THREE.MeshLambertMaterial({ color: 0xcc0000 })
-    );
-    band.position.set(-12 + i * 12, 30, -12);
-    g.add(band);
-  }
-  
-  g.position.set(x, 0, z);
-  return g;
-}
-
-function createHospital(x, z) {
-  var g = new THREE.Group();
-  
-  var main = new THREE.Mesh(new THREE.BoxGeometry(26, 14, 20), MAT.hospitalWall);
-  main.position.y = 7;
-  g.add(main);
-  
-  var stripe = new THREE.Mesh(
-    new THREE.BoxGeometry(26.5, 0.8, 20.5),
-    new THREE.MeshLambertMaterial({ color: 0xcc0000 })
-  );
-  stripe.position.y = 2.5;
-  g.add(stripe);
-  
-  var crossV = new THREE.Mesh(new THREE.BoxGeometry(0.8, 3.5, 0.3), MAT.hospitalRed);
-  crossV.position.set(0, 18, 10.1);
-  g.add(crossV);
-  
-  var crossH = new THREE.Mesh(new THREE.BoxGeometry(3.5, 0.8, 0.3), MAT.hospitalRed);
-  crossH.position.set(0, 18, 10.1);
-  g.add(crossH);
-  
-  g.position.set(x, 0, z);
-  return g;
-}
-
-function createSouk(x, z) {
-  var g = new THREE.Group();
-  var colors = [0xe74c3c, 0x3498db, 0xf39c12, 0x2ecc71, 0x9b59b6, 0xe67e22];
-  
-  for (var i = 0; i < 10; i++) {
-    var angle = (i / 10) * Math.PI * 2;
-    var cx = Math.cos(angle) * 9;
-    var cz = Math.sin(angle) * 9;
-    
-    var stall = new THREE.Mesh(
-      new THREE.BoxGeometry(2.8, 2.2, 2.8),
-      new THREE.MeshLambertMaterial({ color: colors[i % colors.length] })
-    );
-    stall.position.set(cx, 1.1, cz);
-    g.add(stall);
-    
-    var awning = new THREE.Mesh(
-      new THREE.ConeGeometry(2.5, 1.6, 4),
-      new THREE.MeshLambertMaterial({ color: 0xf5f5f5 })
-    );
-    awning.position.set(cx, 3.2, cz);
-    awning.rotation.y = Math.PI / 4;
-    g.add(awning);
-  }
-  
-  g.position.set(x, 0, z);
-  return g;
-}
-
-function createBusStop(x, z, color) {
-  var g = new THREE.Group();
-  
-  var sign = new THREE.Mesh(
-    new THREE.BoxGeometry(3.5, 2.2, 0.2),
-    new THREE.MeshLambertMaterial({ color: color })
-  );
-  sign.position.y = 2.8;
-  g.add(sign);
-  
-  for (var s = -1; s <= 1; s += 2) {
-    var pole = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.1, 0.1, 3.5),
-      new THREE.MeshLambertMaterial({ color: 0x666666 })
-    );
-    pole.position.set(s * 1.3, 1.75, 0);
-    g.add(pole);
-  }
-  
-  g.position.set(x, 0, z);
-  return g;
-}
-
-function createLandmarks() {
-  console.log('🏛️ بناء المعالم الحقيقية...');
-  var group = new THREE.Group();
-  
-  group.add(createStation(-220, -60));
-  group.add(createMosque(-100, 180));
-  group.add(createFactory(350, -260));
-  group.add(createHospital(-480, 130));
-  group.add(createSouk(90, 160));
-  group.add(createBusStop(160, 60, 0xe74c3c));
-  group.add(createBusStop(-130, -70, 0xf39c12));
-  group.add(createBusStop(350, 90, 0xe67e22));
-  group.add(createBusStop(480, -18, 0x2980b9));
-  
-  scene.add(group);
-  console.log('✅ تم بناء', DESTINATIONS_DATA.length, 'معلم');
-}
-
-/* ============================================================
-   السيارات
-   ============================================================ */
-var cars = [];
-function createCar(x, z, rot) {
-  var car = new THREE.Group();
-  var bodyMat = Utils.pick(MAT.carBody);
-  
-  var body = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.6, 3.8), bodyMat);
-  body.position.y = 0.5;
-  car.add(body);
-  
-  var cabin = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.5, 1.8), bodyMat);
-  cabin.position.set(0, 1.05, -0.2);
-  car.add(cabin);
-  
-  var windshield = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.4, 0.1), MAT.glass);
-  windshield.position.set(0, 1.05, 0.7);
-  car.add(windshield);
-  
-  var tireGeo = new THREE.CylinderGeometry(0.32, 0.32, 0.22, 8);
-  
-  for (var wx = -1; wx <= 1; wx += 2) {
-    for (var wz = -1; wz <= 1; wz += 2) {
-      var tire = new THREE.Mesh(tireGeo, MAT.carTire);
-      tire.rotation.z = Math.PI / 2;
-      tire.position.set(wx * 0.9, 0.32, wz * 1.2);
-      car.add(tire);
-    }
-  }
-  
-  car.position.set(x, 0, z);
-  car.rotation.y = rot;
-  return car;
-}
-
-function createCars() {
-  var group = new THREE.Group();
-  
-  for (var i = 0; i < QUALITY.carsCount; i++) {
-    var rd = Utils.pick(ROADS_DATA);
-    var off = Utils.rand(-rd.length / 2 + 30, rd.length / 2 - 30);
-    var x = rd.x + Math.sin(rd.rotation) * off;
-    var z = rd.z + Math.cos(rd.rotation) * off;
-    
-    var car = createCar(x, z, rd.rotation + (Math.random() > 0.5 ? 0 : Math.PI));
-    car.userData = { 
-      road: rd, offset: off, 
-      speed: Utils.rand(2, 5), 
-      direction: Math.random() > 0.5 ? 1 : -1 
-    };
-    group.add(car);
-    cars.push(car);
-  }
-  
-  scene.add(group);
-}
-
-function updateCars(dt) {
-  for (var i = 0; i < cars.length; i++) {
-    var c = cars[i];
-    var ud = c.userData;
-    ud.offset += ud.speed * ud.direction * dt;
-    
-    if (ud.offset > ud.road.length / 2 - 20) { 
-      ud.direction = -1; 
-      c.rotation.y = ud.road.rotation + Math.PI; 
-    }
-    if (ud.offset < -ud.road.length / 2 + 20) { 
-      ud.direction = 1; 
-      c.rotation.y = ud.road.rotation; 
-    }
-    
-    c.position.x = ud.road.x + Math.sin(ud.road.rotation) * ud.offset;
-    c.position.z = ud.road.z + Math.cos(ud.road.rotation) * ud.offset;
-  }
-}
-
-/* ============================================================
-   الناس
-   ============================================================ */
-var people = [];
-function createPerson(x, z) {
-  var p = new THREE.Group();
-  
-  var shirtMat = Utils.pick(MAT.peopleShirt);
-  var pantsMat = Utils.pick(MAT.peoplePants);
-  var skinMat = Utils.pick(MAT.peopleSkin);
-  
-  var torso = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.65, 0.26), shirtMat);
-  torso.position.y = 1.08;
-  p.add(torso);
-  
-  var head = new THREE.Mesh(new THREE.SphereGeometry(0.17, 8, 8), skinMat);
-  head.position.y = 1.62;
-  p.add(head);
-  
-  var legs = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.8, 0.26), pantsMat);
-  legs.position.y = 0.35;
-  p.add(legs);
-  
-  var armGeo = new THREE.BoxGeometry(0.12, 0.58, 0.12);
-  var armL = new THREE.Mesh(armGeo, shirtMat);
-  armL.position.set(-0.27, 1.08, 0);
-  p.add(armL);
-  
-  var armR = new THREE.Mesh(armGeo, shirtMat);
-  armR.position.set(0.27, 1.08, 0);
-  p.add(armR);
-  
-  p.position.set(x, 0, z);
-  p.userData = {
-    direction: Math.random() * Math.PI * 2,
-    speed: Utils.rand(0.8, 1.6),
-    walkPhase: Math.random() * Math.PI * 2,
-    armL: armL,
-    armR: armR,
-    homeX: x,
-    homeZ: z,
-    wanderTimer: 0,
-  };
-  
-  return p;
-}
-
-function createPeople() {
-  var group = new THREE.Group();
-  
-  for (var i = 0; i < QUALITY.peopleCount; i++) {
-    var rd = Utils.pick(ROADS_DATA);
-    var off = Utils.rand(-rd.length / 2 + 30, rd.length / 2 - 30);
-    var side = Math.random() > 0.5 ? 1 : -1;
-    var so = side * (rd.width / 2 + CONFIG.sidewalkWidth / 2);
-    
-    var x = rd.x + Math.sin(rd.rotation) * off + Math.cos(rd.rotation) * so;
-    var z = rd.z + Math.cos(rd.rotation) * off - Math.sin(rd.rotation) * so;
-    
-    if (Math.abs(z) < CONFIG.canalWidth / 2 + 4) continue;
-    
-    var person = createPerson(x, z);
-    group.add(person);
-    people.push(person);
-  }
-  
-  scene.add(group);
-}
-
-function updatePeople(dt) {
-  for (var i = 0; i < people.length; i++) {
-    var p = people[i];
-    var ud = p.userData;
-    
-    ud.walkPhase += dt * 5;
-    p.position.y = Math.abs(Math.sin(ud.walkPhase)) * 0.05;
-    
-    ud.wanderTimer -= dt;
-    if (ud.wanderTimer <= 0) {
-      ud.direction += Utils.rand(-0.8, 0.8);
-      ud.wanderTimer = Utils.rand(1, 3);
-    }
-    
-    var dx = ud.homeX - p.position.x;
-    var dz = ud.homeZ - p.position.z;
-    var distFromHome = Math.hypot(dx, dz);
-    if (distFromHome > 8) {
-      ud.direction = Math.atan2(dz, dx);
-    }
-    
-    p.position.x += Math.cos(ud.direction) * ud.speed * dt;
-    p.position.z += Math.sin(ud.direction) * ud.speed * dt;
-    p.rotation.y = -ud.direction + Math.PI / 2;
-    
-    if (ud.armL) ud.armL.rotation.x = Math.sin(ud.walkPhase) * 0.6;
-    if (ud.armR) ud.armR.rotation.x = -Math.sin(ud.walkPhase) * 0.6;
-  }
-}
-
-/* ============================================================
-   التوك توك
-   ============================================================ */
-function createTukTuk() {
-  var t = new THREE.Group();
-  t.name = 'tukTuk';
-  
-  var chassis = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.12, 2.4), MAT.black);
-  chassis.position.y = 0.42;
-  t.add(chassis);
-  
-  var floorF = new THREE.Mesh(new THREE.BoxGeometry(1.25, 0.08, 1.0), MAT.black);
-  floorF.position.set(0, 0.52, 0.65);
-  t.add(floorF);
-  
-  var floorR = new THREE.Mesh(new THREE.BoxGeometry(1.25, 0.08, 1.3), MAT.black);
-  floorR.position.set(0, 0.52, -0.6);
-  t.add(floorR);
-  
-  var front = new THREE.Mesh(new THREE.BoxGeometry(1.28, 0.85, 1.0), MAT.yellow);
-  front.position.set(0, 0.95, 0.6);
-  t.add(front);
-  
-  var rear = new THREE.Mesh(new THREE.BoxGeometry(1.32, 1.5, 1.4), MAT.yellow);
-  rear.position.set(0, 1.25, -0.6);
-  t.add(rear);
-  
-  var roof = new THREE.Mesh(new THREE.BoxGeometry(1.42, 0.1, 2.5), MAT.black);
-  roof.position.set(0, 2.1, 0);
-  t.add(roof);
-  
-  var pillarGeo = new THREE.CylinderGeometry(0.04, 0.04, 1.75, 5);
-  var positions = [
-    [-0.62, 1.2, -1.2], [0.62, 1.2, -1.2],
-    [-0.62, 1.2, -0.05], [0.62, 1.2, -0.05],
-    [-0.62, 1.2, 1.05], [0.62, 1.2, 1.05],
-  ];
-  for (var i = 0; i < positions.length; i++) {
-    var p = new THREE.Mesh(pillarGeo, MAT.black);
-    p.position.set(positions[i][0], positions[i][1], positions[i][2]);
-    t.add(p);
-  }
-  
-  var windshield = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.85, 0.04), MAT.glass);
-  windshield.position.set(0, 1.85, 1.1);
-  windshield.rotation.x = -0.1;
-  t.add(windshield);
-  
-  for (var s = -1; s <= 1; s += 2) {
-    var sg = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.8, 0.9), MAT.glass);
-    sg.position.set(s * 0.64, 1.8, 0.6);
-    t.add(sg);
-    
-    var rg = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.95, 1.2), MAT.glass);
-    rg.position.set(s * 0.66, 1.7, -0.6);
-    t.add(rg);
-  }
-  
-  var rearGlass = new THREE.Mesh(new THREE.BoxGeometry(1.28, 1, 0.04), MAT.glass);
-  rearGlass.position.set(0, 1.7, -1.28);
-  t.add(rearGlass);
-  
-  var hlGeo = new THREE.CylinderGeometry(0.12, 0.12, 0.08, 8);
-  for (var s = -1; s <= 1; s += 2) {
-    var hlg = new THREE.Mesh(hlGeo, MAT.headlight);
-    hlg.rotation.x = Math.PI / 2;
-    hlg.position.set(s * 0.44, 1.15, 1.12);
-    t.add(hlg);
-  }
-  
-  var tlGeo = new THREE.BoxGeometry(0.12, 0.2, 0.05);
-  for (var s = -1; s <= 1; s += 2) {
-    var tl = new THREE.Mesh(tlGeo, MAT.taillight);
-    tl.position.set(s * 0.48, 0.9, -1.3);
-    t.add(tl);
-  }
-  
-  var grill = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.3, 0.06), MAT.chrome);
-  grill.position.set(0, 0.95, 1.13);
-  t.add(grill);
-  
-  var steerG = new THREE.Group();
-  var steerRing = new THREE.Mesh(new THREE.TorusGeometry(0.15, 0.02, 5, 12), MAT.black);
-  steerG.add(steerRing);
-  for (var i = 0; i < 3; i++) {
-    var spoke = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.14, 0.015), MAT.black);
-    spoke.rotation.z = (i / 3) * Math.PI * 2;
-    steerG.add(spoke);
-  }
-  steerG.position.set(0, 1.5, 0.8);
-  steerG.rotation.x = -0.35;
-  t.add(steerG);
-  
-  var dash = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.2, 0.3), MAT.black);
-  dash.position.set(0, 1.3, 0.95);
-  t.add(dash);
-  
-  var seatMat = new THREE.MeshLambertMaterial({ color: 0x2a2a2a });
-  var seat1 = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.1, 0.45), seatMat);
-  seat1.position.set(0, 0.78, 0.3);
-  t.add(seat1);
-  
-  var back1 = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.08), seatMat);
-  back1.position.set(0, 1.05, 0.1);
-  t.add(back1);
-  
-  var seat2 = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.1, 0.5), seatMat);
-  seat2.position.set(0, 0.78, -0.7);
-  t.add(seat2);
-  
-  var back2 = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.6, 0.08), seatMat);
-  back2.position.set(0, 1.1, -0.95);
-  t.add(back2);
-  
-  var wheels = [];
-  
-  function makeWheel(x, z, isFront) {
-    var wg = new THREE.Group();
-    wg.userData.isFront = isFront;
-    
-    var tire = new THREE.Mesh(new THREE.TorusGeometry(0.24, 0.1, 6, 12), MAT.carTire);
-    tire.rotation.y = Math.PI / 2;
-    wg.add(tire);
-    
-    var rim = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.12, 6), MAT.chrome);
-    rim.rotation.z = Math.PI / 2;
-    wg.add(rim);
-    
-    wg.position.set(x, 0.24, z);
-    t.add(wg);
-    wheels.push(wg);
-    return wg;
-  }
-  
-  makeWheel(0, 1.1, true);
-  makeWheel(-0.6, -0.75, false);
-  makeWheel(0.6, -0.75, false);
-  
-  t.userData = {
-    wheels: wheels,
-    steeringWheel: steerG,
-  };
-  
-  return t;
-}
-
-var tukTuk = createTukTuk();
-tukTuk.position.set(0, 0, 150);
-scene.add(tukTuk);
-
-/* ============================================================
-   حالة اللاعب
-   ============================================================ */
-var player = {
-  speed: 0,
-  steering: 0,
-  currentWheelAngle: 0,
-  engineOn: true,
-  handbrake: false,
-  hasPassenger: false,
-  currentPassenger: null,
-  tripStartTime: 0,
+// تصدير للاستخدام الداخلي
+window._GAME = {
+  CONFIG: CONFIG,
+  QUALITY: QUALITY,
+  scene: scene,
+  camera: camera,
+  renderer: renderer,
+  UI: UI,
+  Utils: Utils,
+  MAT: MAT,
+  DIALOGS: DIALOGS,
+  RADIO_TRACKS: RADIO_TRACKS,
+  radio: radio,
+  ROADS_DATA: ROADS_DATA,
+  DESTINATIONS_DATA: DESTINATIONS_DATA,
+  AudioSystem: AudioSystem,
+  canalRef: canalRef,
+  createGround: createGround,
+  createCanal: createCanal,
+  createRoads: createRoads,
+  createRailway: createRailway,
+  createTree: createTree,
+  createPalm: createPalm,
+  createFoliage: createFoliage,
+  makeTextTexture: makeTextTexture,
+  sunLight: sunLight,
 };
 
-/* ============================================================
-   كاميرا الشخص الثالث
-   ============================================================ */
-var CAMERA_DISTANCE = 7;
-var CAMERA_HEIGHT = 3.5;
-var CAMERA_LOOK_HEIGHT = 1.2;
-
-function updateCamera(dt) {
-  var forwardX = Math.sin(tukTuk.rotation.y);
-  var forwardZ = Math.cos(tukTuk.rotation.y);
-  
-  var targetX = tukTuk.position.x - forwardX * CAMERA_DISTANCE;
-  var targetY = CAMERA_HEIGHT;
-  var targetZ = tukTuk.position.z - forwardZ * CAMERA_DISTANCE;
-  
-  var smoothFactor = 1 - Math.pow(0.0001, dt);
-  camera.position.x += (targetX - camera.position.x) * smoothFactor;
-  camera.position.y += (targetY - camera.position.y) * smoothFactor;
-  camera.position.z += (targetZ - camera.position.z) * smoothFactor;
-  
-  camera.lookAt(
-    tukTuk.position.x,
-    tukTuk.position.y + CAMERA_LOOK_HEIGHT,
-    tukTuk.position.z
-  );
-}
-
-/* ============================================================
-   المدخلات
-   ============================================================ */
-var keys = {};
-
-document.addEventListener('keydown', function(e) {
-  keys[e.code] = true;
-  if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].indexOf(e.code) !== -1) {
-    e.preventDefault();
-  }
-  if (e.code === 'Space') player.handbrake = true;
-  if (e.code === 'KeyE') {
-    player.engineOn = !player.engineOn;
-    AudioSystem.setEngine(player.engineOn);
-    UI.showToast(player.engineOn ? '🔊 المحرك شغّال' : '🔇 المحرك مطفأ', 1000);
-  }
-  if (e.code === 'KeyH') {
-    AudioSystem.playHorn();
-  }
-});
-
-document.addEventListener('keyup', function(e) {
-  keys[e.code] = false;
-  if (e.code === 'Space') player.handbrake = false;
-});
-
-/* ============================================================
-   أزرار الموبايل
-   ============================================================ */
-var mobileInput = {
-  accel: false,
-  brake: false,
-  left: false,
-  right: false,
-};
-
-function setupMobileButtons() {
-  var buttons = {
-    btnAccel: 'accel',
-    btnBrake: 'brake',
-    btnLeft: 'left',
-    btnRight: 'right',
-  };
-  
-  Object.keys(buttons).forEach(function(id) {
-    var el = document.getElementById(id);
-    if (!el) return;
-    var key = buttons[id];
-    
-    var press = function(e) {
-      e.preventDefault();
-      e.stopPropagation();
-      mobileInput[key] = true;
-      el.classList.add('pressed');
-    };
-    var release = function(e) {
-      e.preventDefault();
-      e.stopPropagation();
-      mobileInput[key] = false;
-      el.classList.remove('pressed');
-    };
-    
-    el.addEventListener('touchstart', press, { passive: false });
-    el.addEventListener('touchend', release, { passive: false });
-    el.addEventListener('touchcancel', release, { passive: false });
-    el.addEventListener('mousedown', press);
-    el.addEventListener('mouseup', release);
-    el.addEventListener('mouseleave', release);
-  });
-  
-  var hbBtn = document.getElementById('btnHandbrake');
-  if (hbBtn) {
-    var hbPress = function(e) {
-      e.preventDefault();
-      e.stopPropagation();
-      player.handbrake = true;
-      hbBtn.classList.add('pressed');
-    };
-    var hbRelease = function(e) {
-      e.preventDefault();
-      e.stopPropagation();
-      player.handbrake = false;
-      hbBtn.classList.remove('pressed');
-    };
-    hbBtn.addEventListener('touchstart', hbPress, { passive: false });
-    hbBtn.addEventListener('touchend', hbRelease, { passive: false });
-    hbBtn.addEventListener('mousedown', hbPress);
-    hbBtn.addEventListener('mouseup', hbRelease);
-  }
-}
-
-/* ============================================================
-   فيزياء التوك توك
-   ============================================================ */
-function updateTukTukPhysics(dt) {
-  if (!gameState.running || gameState.paused) return;
-  
-  var throttle = (keys['KeyW'] || keys['ArrowUp'] || mobileInput.accel) ? 1 : 0;
-  var brake = (keys['KeyS'] || keys['ArrowDown'] || mobileInput.brake) ? 1 : 0;
-  
-  if (!player.engineOn) {
-    player.speed *= (1 - 3 * dt);
-    if (Math.abs(player.speed) < 0.1) player.speed = 0;
-  } else if (player.handbrake) {
-    player.speed *= (1 - 10 * dt);
-    if (Math.abs(player.speed) < 0.1) player.speed = 0;
-  } else {
-    if (throttle && !brake) {
-      player.speed += CONFIG.acceleration * dt;
-    } else if (brake && !throttle) {
-      if (player.speed > 0.5) {
-        player.speed -= CONFIG.braking * dt;
-      } else {
-        player.speed -= CONFIG.acceleration * 0.5 * dt;
-      }
-    } else {
-      if (player.speed > 0) {
-        player.speed -= CONFIG.friction * dt * 3;
-        if (player.speed < 0.05) player.speed = 0;
-      } else if (player.speed < 0) {
-        player.speed += CONFIG.friction * dt * 3;
-        if (player.speed > -0.05) player.speed = 0;
-      }
-    }
-    player.speed = Utils.clamp(player.speed, -CONFIG.maxReverseSpeed, CONFIG.maxSpeed);
-  }
-  
-  var leftInput = (keys['KeyA'] || keys['ArrowLeft'] || mobileInput.left) ? 1 : 0;
-  var rightInput = (keys['KeyD'] || keys['ArrowRight'] || mobileInput.right) ? 1 : 0;
-  var steerInput = rightInput - leftInput;
-  
-  var steerDiff = steerInput - player.steering;
-  var steerStep = Math.sign(steerDiff) * Math.min(Math.abs(steerDiff), CONFIG.steeringSpeed * dt);
-  player.steering += steerStep;
-  player.steering = Utils.clamp(player.steering, -1, 1);
-  if (steerInput === 0) player.steering *= (1 - 2 * dt);
-  
-  var speedRatio = Math.min(Math.abs(player.speed) / CONFIG.maxSpeed, 1);
-  var maxAngle = CONFIG.maxWheelAngle * (1 - speedRatio * 0.55);
-  player.currentWheelAngle = player.steering * maxAngle;
-  
-  if (Math.abs(player.speed) > 0.1) {
-    var speedFactor = Math.min(Math.abs(player.speed) / 7, 1.2);
-    var direction = player.speed >= 0 ? 1 : -1;
-    var turnRate = player.currentWheelAngle * speedFactor * dt * 3 * direction;
-    tukTuk.rotation.y -= turnRate;
-  }
-  
-  var forward = new THREE.Vector3(
-    Math.sin(tukTuk.rotation.y), 0, Math.cos(tukTuk.rotation.y)
-  );
-  var velocity = forward.multiplyScalar(player.speed * dt);
-  var newPos = tukTuk.position.clone().add(velocity);
-  
-  var inCanalX = !(newPos.x > -13 && newPos.x < 13);
-  var nearCanal = Math.abs(newPos.z) < CONFIG.canalWidth / 2 + 1.5;
-  
-  if (nearCanal && inCanalX) {
-    player.speed *= -0.25;
-  } else if (Math.abs(newPos.x) < CONFIG.citySize / 2 - 3 && Math.abs(newPos.z) < CONFIG.citySize / 2 - 3) {
-    tukTuk.position.copy(newPos);
-  } else {
-    player.speed *= -0.3;
-  }
-  
-  var wheelRoll = (player.speed * dt) / 0.24;
-  for (var i = 0; i < tukTuk.userData.wheels.length; i++) {
-    var w = tukTuk.userData.wheels[i];
-    var tire = w.children[0];
-    if (tire) tire.rotation.x += wheelRoll;
-    if (w.userData.isFront) w.rotation.y = player.currentWheelAngle;
-  }
-  
-  tukTuk.userData.steeringWheel.rotation.z = -player.steering * Math.PI * 0.85;
-  tukTuk.position.y = 0;
-}
-
-/* ============================================================
-   حالة اللعبة
-   ============================================================ */
-var gameState = {
-  running: false,
-  paused: false,
-  money: 0,
-  deliveries: 0,
-  ratingSum: 0,
-  timeLeft: CONFIG.gameDuration,
-  lastTime: 0,
-  spawnTimer: 0,
-  elapsedTime: 0,
-  dialogTimer: 0,
-  trafficWarnTimer: 0,
-};
-
-/* ============================================================
-   الركاب
-   ============================================================ */
-var passengers = [];
-var activeDestination = null;
-
-function getPassengerSpawnPoint() {
-  var candidates = [];
-  
-  for (var i = 0; i < ROADS_DATA.length; i++) {
-    var rd = ROADS_DATA[i];
-    if (rd.width < 14) continue;
-    
-    var steps = Math.floor(rd.length / 100);
-    for (var j = 0; j < steps; j++) {
-      var off = -rd.length / 2 + j * 100 + 50;
-      var side = Math.random() > 0.5 ? 1 : -1;
-      var so = side * (rd.width / 2 + CONFIG.sidewalkWidth / 2);
-      var x = rd.x + Math.sin(rd.rotation) * off + Math.cos(rd.rotation) * so;
-      var z = rd.z + Math.cos(rd.rotation) * off - Math.sin(rd.rotation) * so;
-      
-      if (Math.abs(z) < CONFIG.canalWidth / 2 + 4) continue;
-      if (Math.abs(x + 250) < 8) continue;
-      
-      var dist = Math.hypot(x - tukTuk.position.x, z - tukTuk.position.z);
-      if (dist < 50 || dist > 350) continue;
-      
-      candidates.push({ x: x, z: z });
-    }
-  }
-  
-  if (candidates.length === 0) return null;
-  return Utils.pick(candidates);
-}
-
-function createPassengerMesh() {
-  var group = new THREE.Group();
-  
-  var shirtMat = Utils.pick(MAT.peopleShirt);
-  var pantsMat = Utils.pick(MAT.peoplePants);
-  var skinMat = Utils.pick(MAT.peopleSkin);
-  
-  var torso = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.65, 0.28), shirtMat);
-  torso.position.y = 1.1;
-  group.add(torso);
-  
-  var head = new THREE.Mesh(new THREE.SphereGeometry(0.16, 8, 8), skinMat);
-  head.position.y = 1.6;
-  group.add(head);
-  
-  var legs = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.75, 0.28), pantsMat);
-  legs.position.y = 0.4;
-  group.add(legs);
-  
-  var ringMat = new THREE.MeshBasicMaterial({
-    color: 0x00ff88, transparent: true, opacity: 0.7, side: THREE.DoubleSide,
-  });
-  var ring = new THREE.Mesh(new THREE.RingGeometry(0.5, 0.75, 12), ringMat);
-  ring.rotation.x = -Math.PI / 2;
-  ring.position.y = 0.05;
-  group.add(ring);
-  group.userData.ring = ring;
-  
-  return group;
-}
-
-function spawnPassenger() {
-  if (passengers.length >= CONFIG.maxPassengers) return;
-  if (player.hasPassenger) return;
-  
-  var spawnPoint = getPassengerSpawnPoint();
-  if (!spawnPoint) return;
-  
-  var destination;
-  var attempts = 0;
-  do {
-    destination = Utils.pick(DESTINATIONS_DATA);
-    attempts++;
-  } while (attempts < 10 && passengers.some(function(p) { 
-    return p.destination.name === destination.name; 
-  }));
-  
-  var mesh = createPassengerMesh();
-  mesh.position.set(spawnPoint.x, 0, spawnPoint.z);
-  scene.add(mesh);
-  
-  passengers.push({
-    mesh: mesh,
-    x: spawnPoint.x,
-    z: spawnPoint.z,
-    destination: destination,
-    bobPhase: Math.random() * Math.PI * 2,
-  });
-  
-  updateMissionUI();
-}
-
-function createDestinationMarker(destination) {
-  var group = new THREE.Group();
-  
-  var ringMat = new THREE.MeshBasicMaterial({
-    color: destination.color, transparent: true, opacity: 0.7, side: THREE.DoubleSide,
-  });
-  var ring = new THREE.Mesh(new THREE.RingGeometry(2, 3, 16), ringMat);
-  ring.rotation.x = -Math.PI / 2;
-  ring.position.y = 0.1;
-  group.add(ring);
-  
-  var beamMat = new THREE.MeshBasicMaterial({
-    color: destination.color, transparent: true, opacity: 0.25, side: THREE.DoubleSide,
-  });
-  var beam = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 1.5, 8, 8, 1, true), beamMat);
-  beam.position.y = 4;
-  group.add(beam);
-  
-  var iconMat = new THREE.MeshBasicMaterial({ color: destination.color });
-  var icon = new THREE.Mesh(new THREE.SphereGeometry(0.6, 10, 10), iconMat);
-  icon.position.y = 6;
-  group.add(icon);
-  
-  group.position.set(destination.x, 0, destination.z);
-  group.userData = {
-    destination: destination,
-    startTime: performance.now(),
-    icon: icon,
-    ring: ring,
-  };
-  
-  return group;
-}
-
-function checkPassengerPickup() {
-  if (player.hasPassenger) return;
-  
-  for (var i = passengers.length - 1; i >= 0; i--) {
-    var p = passengers[i];
-    var dist = Math.hypot(p.x - tukTuk.position.x, p.z - tukTuk.position.z);
-    
-    if (dist < 3) {
-      var dest = p.destination;
-      
-      scene.remove(p.mesh);
-      passengers.splice(i, 1);
-      
-      player.hasPassenger = true;
-      player.currentPassenger = dest;
-      player.tripStartTime = performance.now();
-      
-      activeDestination = createDestinationMarker(dest);
-      scene.add(activeDestination);
-      
-      AudioSystem.playPickup();
-      UI.showDialog(Utils.pick(DIALOGS.pickup), 3000);
-      UI.showToast('✅ راكب صعد! → ' + dest.name, 2500);
-      
-      var riderMesh = createPassengerMesh();
-      riderMesh.scale.set(0.8, 0.8, 0.8);
-      riderMesh.position.set(0, 0.35, -0.7);
-      riderMesh.userData.ring.visible = false;
-      tukTuk.add(riderMesh);
-      tukTuk.userData.passengerRider = riderMesh;
-      
-      updateMissionUI();
-      break;
-    }
-  }
-}
-
-function checkDelivery() {
-  if (!player.hasPassenger || !activeDestination) return;
-  
-  var dest = activeDestination.userData.destination;
-  var dist = Math.hypot(dest.x - tukTuk.position.x, dest.z - tukTuk.position.z);
-  
-  if (dist < 5) {
-    var tripTime = (performance.now() - player.tripStartTime) / 1000;
-    var reward = 60;
-    var rating = 3;
-    
-    if (tripTime < 30) { reward = 120; rating = 5; }
-    else if (tripTime < 60) { reward = 100; rating = 4; }
-    else if (tripTime < 90) { reward = 80; rating = 3; }
-    else { reward = 60; rating = 2; }
-    
-    gameState.timeLeft = Math.min(gameState.timeLeft + CONFIG.deliveryBonus, CONFIG.gameDuration);
-    gameState.money += reward;
-    gameState.deliveries++;
-    gameState.ratingSum += rating;
-    
-    AudioSystem.playDelivery();
-    UI.showDialog(Utils.pick(DIALOGS.arrived), 2500);
-    UI.showToast('🎉 توصيل! +' + reward + ' جنيه +30 ثانية', 2500);
-    
-    scene.remove(activeDestination);
-    activeDestination = null;
-    
-    if (tukTuk.userData.passengerRider) {
-      tukTuk.remove(tukTuk.userData.passengerRider);
-      tukTuk.userData.passengerRider = null;
-    }
-    
-    player.hasPassenger = false;
-    player.currentPassenger = null;
-    gameState.spawnTimer = 1;
-    
-    updateHUD();
-    updateMissionUI();
-  }
-}
-
-function updateHUD() {
-  if (UI.moneyValue) UI.moneyValue.textContent = gameState.money;
-  if (UI.deliveriesValue) UI.deliveriesValue.textContent = gameState.deliveries;
-  if (UI.timeValue) UI.timeValue.textContent = Utils.formatTime(gameState.timeLeft);
-  
-  if (UI.timeValue) {
-    if (gameState.timeLeft < 30) {
-      UI.timeValue.classList.add('warning');
-    } else {
-      UI.timeValue.classList.remove('warning');
-    }
-  }
-  
-  var speedKmh = Math.abs(player.speed) * 3.6 * 3.5;
-  if (UI.speedValue) UI.speedValue.textContent = Math.round(speedKmh);
-}
-
-function updateMissionUI() {
-  if (!UI.missionPanel) return;
-  
-  if (player.hasPassenger && player.currentPassenger) {
-    UI.missionPanel.textContent = '🎯 اوصل الراكب إلى: ' + player.currentPassenger.name;
-    UI.missionPanel.style.borderRightColor = '#00ff88';
-  } else if (passengers.length > 0) {
-    UI.missionPanel.textContent = '👤 ' + passengers.length + ' راكب ينتظر — اقترب منهم';
-    UI.missionPanel.style.borderRightColor = '#ffc800';
-  } else {
-    UI.missionPanel.textContent = '🔍 جاري البحث عن راكب...';
-    UI.missionPanel.style.borderRightColor = '#ffc800';
-  }
-}
-
-function updatePassengers(dt) {
-  var now = performance.now();
-  
-  for (var i = 0; i < passengers.length; i++) {
-    var p = passengers[i];
-    p.bobPhase += dt * 3;
-    if (p.mesh) {
-      p.mesh.position.y = Math.sin(p.bobPhase) * 0.04;
-      if (p.mesh.userData.ring) {
-        p.mesh.userData.ring.rotation.z += dt * 0.5;
-      }
-    }
-  }
-  
-  if (activeDestination) {
-    var ud = activeDestination.userData;
-    var time = (now - ud.startTime) / 1000;
-    var pulse = 1 + Math.sin(time * 3) * 0.1;
-    ud.ring.scale.set(pulse, pulse, 1);
-    ud.icon.rotation.y += dt * 2;
-    ud.icon.position.y = 6 + Math.sin(time * 2) * 0.3;
-  }
-  
-  // كلام السواق العشوائي
-  if (player.hasPassenger) {
-    gameState.dialogTimer -= dt;
-    if (gameState.dialogTimer <= 0) {
-      UI.showDialog(Utils.pick(DIALOGS.driving), 2500);
-      gameState.dialogTimer = Utils.rand(8, 15);
-    }
-  }
-  
-  // تحذير من اللجان
-  gameState.trafficWarnTimer -= dt;
-  if (gameState.trafficWarnTimer <= 0) {
-    // التحقق من القرب من نقطة تفتيش
-    for (var i = 0; i < policeCheckpoints.length; i++) {
-      var cp = policeCheckpoints[i];
-      var dist = Math.hypot(cp.position.x - tukTuk.position.x, cp.position.z - tukTuk.position.z);
-      if (dist < 30 && dist > 15) {
-        UI.showDialog(Utils.pick(DIALOGS.police), 2500);
-        gameState.trafficWarnTimer = 15;
-        break;
-      }
-    }
-    // التحقق من إشارة المرور
-    for (var i = 0; i < trafficLights.length; i++) {
-      var tl = trafficLights[i];
-      var dist = Math.hypot(tl.position.x - tukTuk.position.x, tl.position.z - tukTuk.position.z);
-      if (dist < 25 && dist > 10 && tl.userData.state === 0) {
-        UI.showDialog('⚠️ الإشارة حمرا يا معلم', 2000);
-        gameState.trafficWarnTimer = 12;
-        break;
-      }
-    }
-    if (gameState.trafficWarnTimer <= 0) {
-      gameState.trafficWarnTimer = 8;
-    }
-  }
-}
-
-/* ============================================================
-   الحلقة الرئيسية
-   ============================================================ */
-function animate() {
-  requestAnimationFrame(animate);
-  
-  var now = performance.now();
-  var dt = (now - gameState.lastTime) / 1000;
-  gameState.lastTime = now;
-  dt = Math.min(dt, 0.05);
-  
-  if (!gameState.running || gameState.paused) {
-    renderer.render(scene, camera);
-    return;
-  }
-  
-  gameState.elapsedTime += dt;
-  
-  gameState.timeLeft -= dt;
-  if (gameState.timeLeft <= 0) {
-    gameState.timeLeft = 0;
-    endGame();
-    return;
-  }
-  
-  gameState.spawnTimer -= dt;
-  if (gameState.spawnTimer <= 0) {
-    if (passengers.length < CONFIG.maxPassengers && !player.hasPassenger) {
-      spawnPassenger();
-    }
-    gameState.spawnTimer = 2 + Math.random() * 2;
-  }
-  
-  updateTukTukPhysics(dt);
-  checkPassengerPickup();
-  checkDelivery();
-  updateCamera(dt);
-  updatePassengers(dt);
-  updatePeople(dt);
-  updateCars(dt);
-  updateTrafficLights(dt);
-  updatePoliceCheckpoints(dt);
-  
-  var isAccelerating = !!(keys['KeyW'] || keys['ArrowUp'] || mobileInput.accel);
-  AudioSystem.updateEngine(Math.abs(player.speed), CONFIG.maxSpeed, isAccelerating);
-  
-  sunLight.position.set(tukTuk.position.x + 100, 200, tukTuk.position.z + 80);
-  sunLight.target.position.copy(tukTuk.position);
-  sunLight.target.updateMatrixWorld();
-  
-  updateHUD();
-  renderer.render(scene, camera);
-}
-
-/* ============================================================
-   بناء المدينة
-   ============================================================ */
-async function buildCity(onProgress) {
-  var steps = [
-    { name: 'إنشاء الأرضية...', fn: createGround, weight: 5 },
-    { name: 'بناء ترعة المحمودية...', fn: createCanal, weight: 8 },
-    { name: 'رصف الشوارع...', fn: createRoads, weight: 15 },
-    { name: 'مد السكة الحديد...', fn: createRailway, weight: 4 },
-    { name: 'زراعة النخيل والأشجار...', fn: createFoliage, weight: 10 },
-    { name: 'بناء المباني الاحترافية...', fn: createBuildings, weight: 25 },
-    { name: 'بناء المعالم الحقيقية...', fn: createLandmarks, weight: 15 },
-    { name: 'إضافة الناس...', fn: createPeople, weight: 8 },
-    { name: 'إضافة السيارات...', fn: createCars, weight: 5 },
-    { name: 'تركيب إشارات المرور...', fn: createTrafficLights, weight: 3 },
-    { name: 'نصب اللجان الأمنية...', fn: createPoliceCheckpoints, weight: 2 },
-  ];
-  
-  var accumulated = 0;
-  var totalWeight = steps.reduce(function(sum, s) { return sum + s.weight; }, 0);
-  
-  for (var i = 0; i < steps.length; i++) {
-    var step = steps[i];
-    if (onProgress) onProgress(Math.round((accumulated / totalWeight) * 100), step.name);
-    
-    await new Promise(function(resolve) {
-      setTimeout(function() {
-        try { step.fn(); } catch (e) { console.error('خطأ في', step.name, e); }
-        resolve();
-      }, 16);
-    });
-    
-    accumulated += step.weight;
-  }
-  
-  if (onProgress) onProgress(100, 'جاهز للانطلاق! 🚀');
-}
-
-/* ============================================================
-   بدء اللعبة
-   ============================================================ */
-var isInitialized = false;
-
-async function startGame() {
-  console.log('🎬 بدء اللعبة...');
-  
-  AudioSystem.init();
-  AudioSystem.resume();
-  
-  if (isInitialized) {
-    resetGame();
-    gameState.running = true;
-    gameState.paused = false;
-    UI.startScreen.classList.add('hidden');
-    UI.endScreen.classList.add('hidden');
-    UI.hud.classList.add('visible');
-    UI.missionPanel.classList.add('visible');
-    UI.pauseBtn.style.display = 'flex';
-    UI.fullscreenBtn.style.display = 'flex';
-    
-    if (isMobile) {
-      UI.controls.classList.add('visible');
-      UI.showHint('استخدم الأزرار للقيادة', 5000);
-    } else {
-      UI.showHint('W/A/S/D للحركة — H للكلاكس — Space فرملة', 5000);
-    }
-    
-    if (player.engineOn) AudioSystem.setEngine(true);
-    gameState.lastTime = performance.now();
-    return;
-  }
-  
-  UI.startBtn.disabled = true;
-  UI.startBtn.textContent = '⏳ جاري التحميل...';
-  
-  try {
-    await buildCity(function(pct, text) {
-      UI.updateLoading(pct, text);
-    });
-    
-    setupMobileButtons();
-    isInitialized = true;
-    
-    resetGame();
-    gameState.running = true;
-    gameState.lastTime = performance.now();
-    
-    UI.startScreen.classList.add('hidden');
-    UI.endScreen.classList.add('hidden');
-    UI.hud.classList.add('visible');
-    UI.missionPanel.classList.add('visible');
-    UI.pauseBtn.style.display = 'flex';
-    UI.fullscreenBtn.style.display = 'flex';
-    
-    if (isMobile) {
-      UI.controls.classList.add('visible');
-      UI.showHint('استخدم الأزرار للقيادة', 5000);
-    } else {
-      UI.showHint('W/A/S/D للحركة — H للكلاكس — Space فرملة', 5000);
-    }
-    
-    if (player.engineOn) AudioSystem.setEngine(true);
-    
-    setTimeout(function() { spawnPassenger(); }, 500);
-    setTimeout(function() { spawnPassenger(); }, 1500);
-    
-    UI.showToast('🛺 يلا بينا يا معلم!', 2500);
-    UI.showDialog('أهلاً يا باشا، أنا سواق التوك توك', 3000);
-    
-    if (!animate.started) {
-      animate.started = true;
-      gameState.lastTime = performance.now();
-      animate();
-    }
-    
-    console.log('✅ اللعبة بدأت!');
-    
-  } catch (error) {
-    console.error('❌ خطأ:', error);
-    UI.showToast('حدث خطأ أثناء التحميل', 3000);
-    UI.startBtn.disabled = false;
-    UI.startBtn.textContent = '🚀 ابدأ الشغل';
-  }
-}
-
-/* ============================================================
-   إعادة تعيين
-   ============================================================ */
-function resetGame() {
-  gameState.money = 0;
-  gameState.deliveries = 0;
-  gameState.ratingSum = 0;
-  gameState.timeLeft = CONFIG.gameDuration;
-  gameState.spawnTimer = 1;
-  gameState.elapsedTime = 0;
-  gameState.paused = false;
-  gameState.dialogTimer = 5;
-  gameState.trafficWarnTimer = 5;
-  
-  tukTuk.position.set(0, 0, 150);
-  tukTuk.rotation.set(0, 0, 0);
-  
-  player.speed = 0;
-  player.steering = 0;
-  player.currentWheelAngle = 0;
-  player.hasPassenger = false;
-  player.currentPassenger = null;
-  player.engineOn = true;
-  player.handbrake = false;
-  
-  for (var i = 0; i < passengers.length; i++) {
-    scene.remove(passengers[i].mesh);
-  }
-  passengers.length = 0;
-  
-  if (activeDestination) {
-    scene.remove(activeDestination);
-    activeDestination = null;
-  }
-  
-  if (tukTuk.userData.passengerRider) {
-    tukTuk.remove(tukTuk.userData.passengerRider);
-    tukTuk.userData.passengerRider = null;
-  }
-  
-  camera.position.set(
-    tukTuk.position.x,
-    CAMERA_HEIGHT,
-    tukTuk.position.z - CAMERA_DISTANCE
-  );
-  camera.lookAt(
-    tukTuk.position.x,
-    CAMERA_LOOK_HEIGHT,
-    tukTuk.position.z
-  );
-  
-  updateHUD();
-  updateMissionUI();
-}
-
-function togglePause() {
-  if (!gameState.running) return;
-  gameState.paused = !gameState.paused;
-  
-  if (gameState.paused) {
-    UI.pauseBtn.textContent = '▶️';
-    UI.showToast('⏸️ اللعبة متوقفة', 1500);
-    AudioSystem.setEngine(false);
-  } else {
-    UI.pauseBtn.textContent = '⏸️';
-    UI.showToast('▶️ يلا بينا!', 1000);
-    if (player.engineOn) AudioSystem.setEngine(true);
-    gameState.lastTime = performance.now();
-  }
-}
-
-function endGame() {
-  gameState.running = false;
-  AudioSystem.setEngine(false);
-  
-  var avgRating = gameState.deliveries > 0
-    ? (gameState.ratingSum / gameState.deliveries).toFixed(1)
-    : '0';
-  
-  UI.endTitle.textContent = gameState.deliveries > 0 ? '🎉 يوم شغل جميل يا معلم!' : '⏰ خلص الوقت!';
-  UI.endMoney.textContent = gameState.money + ' جنيه';
-  UI.endDeliveries.textContent = gameState.deliveries;
-  UI.endRating.textContent = avgRating + ' ⭐';
-  
-  UI.endScreen.classList.remove('hidden');
-  UI.controls.classList.remove('visible');
-  UI.pauseBtn.style.display = 'none';
-  UI.fullscreenBtn.style.display = 'none';
-  
-  console.log('🏁 انتهت اللعبة');
-}
-
-/* ============================================================
-   ملء الشاشة
-   ============================================================ */
-function toggleFullscreen() {
-  if (!document.fullscreenElement) {
-    if (document.documentElement.requestFullscreen) {
-      document.documentElement.requestFullscreen();
-    } else if (document.documentElement.webkitRequestFullscreen) {
-      document.documentElement.webkitRequestFullscreen();
-    }
-  } else {
-    if (document.exitFullscreen) {
-      document.exitFullscreen();
-    } else if (document.webkitExitFullscreen) {
-      document.webkitExitFullscreen();
-    }
-  }
-}
-
-/* ============================================================
-   ربط الأزرار
-   ============================================================ */
-if (UI.startBtn) {
-  UI.startBtn.addEventListener('click', function(e) {
-    e.preventDefault();
-    startGame();
-  });
-  
-  UI.startBtn.addEventListener('touchstart', function(e) {
-    e.preventDefault();
-    startGame();
-  }, { passive: false });
-}
-
-if (UI.restartBtn) {
-  UI.restartBtn.addEventListener('click', function() {
-    UI.endScreen.classList.add('hidden');
-    startGame();
-  });
-}
-
-if (UI.pauseBtn) {
-  UI.pauseBtn.addEventListener('click', togglePause);
-}
-
-if (UI.fullscreenBtn) {
-  UI.fullscreenBtn.addEventListener('click', toggleFullscreen);
-}
-
-document.addEventListener('keydown', function(e) {
-  if (e.code === 'Escape' || e.code === 'KeyP') {
-    if (gameState.running) togglePause();
-  }
-});
-
-document.addEventListener('contextmenu', function(e) { e.preventDefault(); });
-
-console.log('🎮 اللعبة جاهزة! اضغط "🚀 ابدأ الشغل"');
+console.log('✅ الجزء 1 من game.js جاهز - الإعدادات والمدينة');
 
 })();
