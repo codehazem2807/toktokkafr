@@ -2,13 +2,11 @@
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, orientation=landscape">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#0a0a1e">
-<meta name="screen-orientation" content="landscape">
-<meta name="x5-orientation" content="landscape">
 <title>🛺 توك توك كفر الدوار</title>
 <style>
   * {
@@ -47,7 +45,7 @@
     z-index: 1;
   }
 
-  /* ============ شاشات البداية والنهاية ============ */
+  /* ============ Overlays ============ */
   .overlay {
     position: fixed;
     inset: 0;
@@ -148,35 +146,33 @@
     display: block;
   }
 
-  /* لوحة الإحصائيات */
   #statsPanel {
     position: absolute;
     top: max(10px, env(safe-area-inset-top));
     right: max(10px, env(safe-area-inset-right));
-    background: rgba(0, 0, 0, 0.72);
+    background: rgba(0, 0, 0, 0.75);
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
     border-radius: 12px;
-    padding: 8px 14px;
+    padding: 6px 12px;
     border: 1.5px solid rgba(255, 200, 0, 0.4);
     display: flex;
-    gap: 14px;
+    gap: 12px;
   }
 
   .stat-item {
     text-align: center;
-    min-width: 45px;
+    min-width: 42px;
   }
 
   .stat-label {
     font-size: 9px;
     color: #ffc800;
     font-weight: 700;
-    letter-spacing: 0.5px;
   }
 
   .stat-value {
-    font-size: clamp(14px, 3.5vw, 18px);
+    font-size: clamp(13px, 3.2vw, 17px);
     font-weight: 900;
     color: #fff;
     font-variant-numeric: tabular-nums;
@@ -192,23 +188,22 @@
     50% { opacity: 0.4; }
   }
 
-  /* عداد السرعة */
   #speedPanel {
     position: absolute;
     top: max(10px, env(safe-area-inset-top));
     left: max(10px, env(safe-area-inset-left));
-    background: rgba(0, 0, 0, 0.72);
+    background: rgba(0, 0, 0, 0.75);
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
     border-radius: 12px;
-    padding: 8px 14px;
+    padding: 6px 12px;
     border: 1.5px solid rgba(0, 255, 136, 0.5);
     text-align: center;
-    min-width: 70px;
+    min-width: 65px;
   }
 
   #speedValue {
-    font-size: clamp(18px, 4.5vw, 24px);
+    font-size: clamp(17px, 4.2vw, 23px);
     font-weight: 900;
     color: #00ff88;
     text-shadow: 0 0 10px rgba(0, 255, 136, 0.6);
@@ -218,23 +213,21 @@
   #speedUnit {
     font-size: 9px;
     color: #00ff88;
-    letter-spacing: 1px;
   }
 
-  /* المهمة */
   #missionPanel {
     position: absolute;
     top: max(10px, env(safe-area-inset-top));
     left: 50%;
     transform: translateX(-50%);
-    background: rgba(0, 0, 0, 0.78);
+    background: rgba(0, 0, 0, 0.8);
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
-    padding: 8px 18px;
-    border-radius: 25px;
-    font-size: clamp(11px, 2.8vw, 14px);
+    padding: 7px 16px;
+    border-radius: 22px;
+    font-size: clamp(11px, 2.7vw, 13px);
     border-right: 4px solid #ffc800;
-    max-width: 60vw;
+    max-width: 55vw;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -246,19 +239,17 @@
     display: block;
   }
 
-  /* ============ الخريطة المصغرة ============ */
+  /* ============ الخريطة ============ */
   #minimap {
     position: absolute;
     bottom: max(10px, env(safe-area-inset-bottom));
     left: max(10px, env(safe-area-inset-left));
-    width: 130px;
-    height: 130px;
+    width: 120px;
+    height: 120px;
     background: rgba(0, 0, 0, 0.7);
-    border-radius: 12px;
+    border-radius: 10px;
     border: 2px solid rgba(255, 200, 0, 0.5);
     overflow: hidden;
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
   }
 
   #minimapCanvas {
@@ -267,7 +258,44 @@
     height: 100%;
   }
 
-  /* ============ أزرار التحكم ============ */
+  /* ============ الحوار (كلام السواق) ============ */
+  #dialogBox {
+    position: absolute;
+    bottom: max(140px, calc(env(safe-area-inset-bottom) + 140px));
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: rgba(0, 0, 0, 0.88);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: 2px solid #ffc800;
+    border-radius: 15px;
+    padding: 12px 20px;
+    max-width: 85vw;
+    font-size: clamp(12px, 3vw, 15px);
+    color: #fff;
+    text-align: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: all 0.3s;
+    z-index: 150;
+    box-shadow: 0 4px 25px rgba(255, 200, 0, 0.4);
+    font-weight: 600;
+    line-height: 1.5;
+  }
+
+  #dialogBox.visible {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+
+  #dialogBox .speaker {
+    color: #ffc800;
+    font-size: 11px;
+    margin-bottom: 4px;
+    letter-spacing: 1px;
+  }
+
+  /* ============ أزرار ============ */
   #controls {
     position: fixed;
     inset: 0;
@@ -298,7 +326,6 @@
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4), inset 0 0 20px rgba(255, 200, 0, 0.15);
     transition: transform 0.08s, background 0.08s;
     font-family: inherit;
-    user-select: none;
   }
 
   .ctrl-btn:active,
@@ -307,30 +334,28 @@
     transform: scale(0.9);
   }
 
-  /* أزرار الدوران (يسار) */
   #btnLeft {
     bottom: max(20px, env(safe-area-inset-bottom));
     left: max(15px, env(safe-area-inset-left));
-    width: 80px;
-    height: 80px;
-    font-size: 32px;
+    width: 76px;
+    height: 76px;
+    font-size: 30px;
   }
 
   #btnRight {
     bottom: max(20px, env(safe-area-inset-bottom));
-    left: calc(max(15px, env(safe-area-inset-left)) + 95px);
-    width: 80px;
-    height: 80px;
-    font-size: 32px;
+    left: calc(max(15px, env(safe-area-inset-left)) + 90px);
+    width: 76px;
+    height: 76px;
+    font-size: 30px;
   }
 
-  /* أزرار التسارع (يمين) */
   #btnAccel {
-    bottom: calc(max(20px, env(safe-area-inset-bottom)) + 90px);
+    bottom: calc(max(20px, env(safe-area-inset-bottom)) + 88px);
     right: max(15px, env(safe-area-inset-right));
-    width: 90px;
-    height: 90px;
-    font-size: 38px;
+    width: 86px;
+    height: 86px;
+    font-size: 36px;
     background: rgba(0, 255, 136, 0.22);
     border-color: rgba(0, 255, 136, 0.8);
     color: #00ff88;
@@ -344,9 +369,9 @@
   #btnBrake {
     bottom: max(20px, env(safe-area-inset-bottom));
     right: max(15px, env(safe-area-inset-right));
-    width: 90px;
-    height: 90px;
-    font-size: 38px;
+    width: 86px;
+    height: 86px;
+    font-size: 36px;
     background: rgba(255, 60, 60, 0.22);
     border-color: rgba(255, 60, 60, 0.8);
     color: #ff4444;
@@ -359,27 +384,26 @@
 
   #btnHandbrake {
     bottom: max(20px, env(safe-area-inset-bottom));
-    right: calc(max(15px, env(safe-area-inset-right)) + 105px);
-    width: 60px;
-    height: 60px;
+    right: calc(max(15px, env(safe-area-inset-right)) + 100px);
+    width: 58px;
+    height: 58px;
     font-size: 22px;
     background: rgba(255, 140, 0, 0.22);
     border-color: rgba(255, 140, 0, 0.8);
     color: #ff8c00;
   }
 
-  /* ============ أزرار علوية ============ */
   .top-btn {
     position: absolute;
     top: max(10px, env(safe-area-inset-top));
-    width: 42px;
-    height: 42px;
+    width: 40px;
+    height: 40px;
     background: rgba(0, 0, 0, 0.7);
     border: 1.5px solid rgba(255, 200, 0, 0.5);
     border-radius: 10px;
     color: #ffc800;
-    font-size: 18px;
-    display: flex;
+    font-size: 17px;
+    display: none;
     align-items: center;
     justify-content: center;
     pointer-events: auto;
@@ -389,33 +413,27 @@
     z-index: 110;
   }
 
-  #pauseBtn {
-    right: 60px;
-  }
+  #pauseBtn { right: 58px; }
+  #fullscreenBtn { right: 10px; }
 
-  #fullscreenBtn {
-    right: 10px;
-  }
-
-  /* ============ Toast ============ */
   #toast {
     position: fixed;
-    top: 40%;
+    top: 35%;
     left: 50%;
     transform: translate(-50%, -50%) scale(0.8);
-    background: rgba(0, 0, 0, 0.9);
+    background: rgba(0, 0, 0, 0.92);
     border: 2px solid #ffc800;
     color: #ffc800;
-    padding: 12px 24px;
-    border-radius: 14px;
-    font-size: clamp(13px, 3.5vw, 18px);
+    padding: 10px 20px;
+    border-radius: 12px;
+    font-size: clamp(12px, 3vw, 16px);
     font-weight: 900;
     opacity: 0;
     pointer-events: none;
     transition: all 0.3s;
     z-index: 200;
     text-align: center;
-    box-shadow: 0 0 30px rgba(255, 200, 0, 0.5);
+    box-shadow: 0 0 25px rgba(255, 200, 0, 0.5);
     max-width: 80vw;
   }
 
@@ -424,17 +442,16 @@
     transform: translate(-50%, -50%) scale(1);
   }
 
-  /* ============ Hint ============ */
   #hint {
     position: fixed;
-    bottom: 50%;
+    bottom: 45%;
     left: 50%;
     transform: translateX(-50%);
     color: #fff;
-    font-size: clamp(11px, 2.5vw, 13px);
+    font-size: clamp(10px, 2.4vw, 12px);
     background: rgba(0, 0, 0, 0.7);
-    padding: 6px 16px;
-    border-radius: 20px;
+    padding: 5px 14px;
+    border-radius: 18px;
     backdrop-filter: blur(6px);
     pointer-events: none;
     z-index: 95;
@@ -444,11 +461,8 @@
     white-space: nowrap;
   }
 
-  #hint.hidden {
-    opacity: 0;
-  }
+  #hint.hidden { opacity: 0; }
 
-  /* ============ شاشة النهاية ============ */
   .result-card {
     background: rgba(0, 0, 0, 0.6);
     border: 2px solid rgba(255, 200, 0, 0.5);
@@ -466,56 +480,18 @@
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   }
 
-  .result-row:last-child {
-    border-bottom: none;
-  }
-
-  .result-label {
-    color: #8899bb;
-  }
-
-  .result-value {
-    color: #ffc800;
-    font-weight: 900;
-  }
-
-  /* ============ شاشة الدوران ============ */
-  #rotateScreen {
-    position: fixed;
-    inset: 0;
-    background: #050518;
-    display: none;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    z-index: 2000;
-    color: #ffc800;
-    text-align: center;
-  }
-
-  #rotateScreen.visible {
-    display: flex;
-  }
-
-  #rotateScreen .icon {
-    font-size: 60px;
-    margin-bottom: 20px;
-    animation: rotate-anim 2s infinite;
-  }
-
-  @keyframes rotate-anim {
-    0%, 100% { transform: rotate(0deg); }
-    50% { transform: rotate(90deg); }
-  }
+  .result-row:last-child { border-bottom: none; }
+  .result-label { color: #8899bb; }
+  .result-value { color: #ffc800; font-weight: 900; }
 
   @media (max-width: 600px) {
-    #statsPanel { padding: 6px 10px; gap: 10px; }
-    .stat-item { min-width: 38px; }
-    #minimap { width: 100px; height: 100px; }
-    #btnLeft, #btnRight { width: 68px; height: 68px; font-size: 26px; }
-    #btnRight { left: calc(max(15px, env(safe-area-inset-left)) + 80px); }
-    #btnAccel, #btnBrake { width: 78px; height: 78px; font-size: 32px; }
-    #btnHandbrake { right: calc(max(15px, env(safe-area-inset-right)) + 90px); width: 52px; height: 52px; }
+    #statsPanel { padding: 5px 9px; gap: 8px; }
+    .stat-item { min-width: 35px; }
+    #minimap { width: 95px; height: 95px; }
+    #btnLeft, #btnRight { width: 65px; height: 65px; font-size: 26px; }
+    #btnRight { left: calc(max(15px, env(safe-area-inset-left)) + 76px); }
+    #btnAccel, #btnBrake { width: 76px; height: 76px; font-size: 30px; }
+    #btnHandbrake { right: calc(max(15px, env(safe-area-inset-right)) + 88px); width: 50px; height: 50px; }
   }
 </style>
 </head>
@@ -523,14 +499,6 @@
 
 <canvas id="gameCanvas"></canvas>
 
-<!-- شاشة دوران الموبايل -->
-<div id="rotateScreen">
-  <div class="icon">📱</div>
-  <h1 style="font-size: 22px; margin-bottom: 10px;">لف الموبايل بالعرض</h1>
-  <p style="color: #8899bb;">اللعبة أفضل في الوضع الأفقي</p>
-</div>
-
-<!-- HUD -->
 <div id="hud">
   <div id="statsPanel">
     <div class="stat-item">
@@ -555,14 +523,18 @@
   <div id="missionPanel">🔍 جاري البحث عن راكب...</div>
 
   <div id="minimap">
-    <canvas id="minimapCanvas" width="260" height="260"></canvas>
+    <canvas id="minimapCanvas" width="240" height="240"></canvas>
+  </div>
+
+  <div id="dialogBox">
+    <div class="speaker">🚕 السواق</div>
+    <div id="dialogText"></div>
   </div>
 
   <button class="top-btn" id="pauseBtn">⏸️</button>
   <button class="top-btn" id="fullscreenBtn">⛶</button>
 </div>
 
-<!-- أزرار التحكم -->
 <div id="controls">
   <button class="ctrl-btn" id="btnLeft">◀</button>
   <button class="ctrl-btn" id="btnRight">▶</button>
@@ -574,37 +546,35 @@
 <div id="hint" class="hidden"></div>
 <div id="toast"></div>
 
-<!-- شاشة البداية -->
 <div class="overlay" id="startScreen">
   <h1>🛺 توك توك كفر الدوار</h1>
-  <div class="subtitle">رحلة ثلاثية الأبعاد</div>
+  <div class="subtitle">رحلة شعبية في شوارع المدينة</div>
   <div class="info">📍 شارع أحمد عرابي • ترعة المحمودية • محطة القطار • مسجد الثورة</div>
-  <div class="info" style="color: #666; font-size: 11px;">بناءً على بيانات الوحدة المحلية لكفر الدوار</div>
-  <button id="startBtn">🚀 ابدأ الرحلة</button>
+  <div class="info" style="color: #666; font-size: 11px;">ابدأ الشغل ووصّل الزباين لأماكنهم</div>
+  <button id="startBtn">🚀 ابدأ الشغل</button>
   <div class="loading-bar">
     <div class="loading-fill" id="loadingFill"></div>
   </div>
   <div id="loadingText">جاري التحضير...</div>
 </div>
 
-<!-- شاشة النهاية -->
 <div class="overlay hidden" id="endScreen">
-  <h1 id="endTitle">انتهت الرحلة!</h1>
+  <h1 id="endTitle">خلص اليوم!</h1>
   <div class="result-card">
     <div class="result-row">
-      <span class="result-label">💰 إجمالي الأرباح</span>
+      <span class="result-label">💰 كسبت النهاردة</span>
       <span class="result-value" id="endMoney">0 جنيه</span>
     </div>
     <div class="result-row">
-      <span class="result-label">👥 عدد التوصيلات</span>
+      <span class="result-label">👥 زباين وصّلتهم</span>
       <span class="result-value" id="endDeliveries">0</span>
     </div>
     <div class="result-row">
-      <span class="result-label">⭐ متوسط التقييم</span>
+      <span class="result-label">⭐ رضاء الزباين</span>
       <span class="result-value" id="endRating">0</span>
     </div>
   </div>
-  <button id="restartBtn">🔄 العب تاني</button>
+  <button id="restartBtn">🔄 يوم شغل جديد</button>
 </div>
 
 <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
