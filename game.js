@@ -3,7 +3,6 @@
    الجزء 1: الإعدادات + المدينة + الخريطة + المواد
    ============================================================ */
 
-(function() {
 'use strict';
 
 console.log('🚀 بدء تحميل لعبة توك توك كفر الدوار V2...');
@@ -3951,7 +3950,7 @@ if (UI.restartBtn) {
   });
 }
 
-if (UI.pauseBtn) {
+if (UI.pauseBtn)
   UI.pauseBtn.addEventListener('click', togglePause);
 }
 
