@@ -1226,3 +1226,915 @@ window.addEventListener('orientationchange', () => {
 });
 
 console.log('✅ الجزء 1 جاهز - المدينة والأدوات');
+/* ============================================================
+   🛺 الجزء 2: التوك توك + نظام القيادة
+   ============================================================ */
+
+/* ============================================================
+   إنشاء موديل التوك توك ثلاثي الأبعاد
+   ============================================================ */
+function createTukTuk() {
+  const tukTuk = new THREE.Group();
+  tukTuk.name = 'tukTuk';
+
+  // ============ المواد الخاصة ============
+  const yellowBody = new THREE.MeshStandardMaterial({
+    color: 0xffc800,
+    roughness: 0.35,
+    metalness: 0.35,
+  });
+
+  const yellowDark = new THREE.MeshStandardMaterial({
+    color: 0xe6a800,
+    roughness: 0.4,
+    metalness: 0.3,
+  });
+
+  const blackPart = new THREE.MeshStandardMaterial({
+    color: 0x0a0a0a,
+    roughness: 0.85,
+    metalness: 0.1,
+  });
+
+  const rubberMat = new THREE.MeshStandardMaterial({
+    color: 0x1a1a1a,
+    roughness: 0.95,
+    metalness: 0.0,
+  });
+
+  const rimMat = new THREE.MeshStandardMaterial({
+    color: 0xdddddd,
+    roughness: 0.2,
+    metalness: 0.95,
+  });
+
+  const chromeMat = new THREE.MeshStandardMaterial({
+    color: 0xcccccc,
+    roughness: 0.15,
+    metalness: 0.98,
+  });
+
+  const headlightMat = new THREE.MeshStandardMaterial({
+    color: 0xffffcc,
+    emissive: 0xffee88,
+    emissiveIntensity: 1.2,
+    roughness: 0.2,
+    metalness: 0.1,
+  });
+
+  const taillightMat = new THREE.MeshStandardMaterial({
+    color: 0xff2222,
+    emissive: 0xcc0000,
+    emissiveIntensity: 0.8,
+    roughness: 0.4,
+  });
+
+  const seatMat = new THREE.MeshStandardMaterial({
+    color: 0x2a2a2a,
+    roughness: 0.95,
+  });
+
+  const dashMat = new THREE.MeshStandardMaterial({
+    color: 0x151515,
+    roughness: 0.9,
+  });
+
+  const glassMat = new THREE.MeshPhysicalMaterial({
+    color: 0xaaddff,
+    roughness: 0.02,
+    metalness: 0.05,
+    transmission: 0.92,
+    transparent: true,
+    opacity: 0.45,
+    thickness: 0.05,
+    ior: 1.5,
+    clearcoat: 1.0,
+    clearcoatRoughness: 0.05,
+  });
+
+  // ============ الهيكل السفلي (Chassis) ============
+  const chassisGeo = new THREE.BoxGeometry(1.35, 0.12, 2.5);
+  const chassis = new THREE.Mesh(chassisGeo, blackPart);
+  chassis.position.y = 0.42;
+  chassis.castShadow = true;
+  chassis.receiveShadow = true;
+  tukTuk.add(chassis);
+
+  // أرضية المقصورة الأمامية
+  const floorFrontGeo = new THREE.BoxGeometry(1.3, 0.08, 1.1);
+  const floorFront = new THREE.Mesh(floorFrontGeo, blackPart);
+  floorFront.position.set(0, 0.52, 0.7);
+  floorFront.castShadow = true;
+  floorFront.receiveShadow = true;
+  tukTuk.add(floorFront);
+
+  // أرضية المقصورة الخلفية
+  const floorRearGeo = new THREE.BoxGeometry(1.3, 0.08, 1.4);
+  const floorRear = new THREE.Mesh(floorRearGeo, blackPart);
+  floorRear.position.set(0, 0.52, -0.65);
+  floorRear.castShadow = true;
+  floorRear.receiveShadow = true;
+  tukTuk.add(floorRear);
+
+  // ============ الجزء الأمامي (المقدمة) ============
+  // الوجه الأمامي
+  const frontPanelGeo = new THREE.BoxGeometry(1.32, 0.85, 0.15);
+  const frontPanel = new THREE.Mesh(frontPanelGeo, yellowBody);
+  frontPanel.position.set(0, 0.98, 1.28);
+  frontPanel.castShadow = true;
+  frontPanel.receiveShadow = true;
+  tukTuk.add(frontPanel);
+
+  // الغطاء الأمامي
+  const hoodGeo = new THREE.BoxGeometry(1.32, 0.08, 0.5);
+  const hood = new THREE.Mesh(hoodGeo, yellowDark);
+  hood.position.set(0, 1.42, 1.05);
+  hood.rotation.x = -0.08;
+  hood.castShadow = true;
+  tukTuk.add(hood);
+
+  // الرفرف الأمامي (Fender)
+  const fenderGeo = new THREE.BoxGeometry(0.5, 0.25, 1.15);
+  const fender = new THREE.Mesh(fenderGeo, yellowBody);
+  fender.position.set(0, 0.72, 1.15);
+  fender.castShadow = true;
+  tukTuk.add(fender);
+
+  // ============ المقصورة الأمامية (السائق) ============
+  const frontCabinGeo = new THREE.BoxGeometry(1.35, 0.95, 1.1);
+  const frontCabin = new THREE.Mesh(frontCabinGeo, yellowBody);
+  frontCabin.position.set(0, 1.0, 0.7);
+  frontCabin.castShadow = true;
+  frontCabin.receiveShadow = true;
+  tukTuk.add(frontCabin);
+
+  // ============ المقصورة الخلفية (الركاب) ============
+  const rearCabinGeo = new THREE.BoxGeometry(1.4, 1.55, 1.5);
+  const rearCabin = new THREE.Mesh(rearCabinGeo, yellowBody);
+  rearCabin.position.set(0, 1.28, -0.65);
+  rearCabin.castShadow = true;
+  rearCabin.receiveShadow = true;
+  tukTuk.add(rearCabin);
+
+  // خط أسود فاصل
+  const stripeGeo = new THREE.BoxGeometry(1.42, 0.08, 1.52);
+  const stripeL = new THREE.Mesh(stripeGeo, blackPart);
+  stripeL.position.set(0, 1.35, -0.65);
+  tukTuk.add(stripeL);
+
+  // ============ السقف ============
+  const roofGeo = new THREE.BoxGeometry(1.5, 0.12, 2.7);
+  const roof = new THREE.Mesh(roofGeo, blackPart);
+  roof.position.set(0, 2.15, 0);
+  roof.castShadow = true;
+  tukTuk.add(roof);
+
+  // حافة السقف (Chrome trim)
+  const roofTrimGeo = new THREE.BoxGeometry(1.52, 0.04, 2.72);
+  const roofTrim = new THREE.Mesh(roofTrimGeo, chromeMat);
+  roofTrim.position.set(0, 2.09, 0);
+  tukTuk.add(roofTrim);
+
+  // ============ أعمدة السقف (6 أعمدة) ============
+  const pillarGeo = new THREE.CylinderGeometry(0.05, 0.05, 1.85, 8);
+  const pillarPositions = [
+    [-0.68, 1.25, -1.35],
+    [0.68, 1.25, -1.35],
+    [-0.68, 1.25, -0.1],
+    [0.68, 1.25, -0.1],
+    [-0.68, 1.25, 1.15],
+    [0.68, 1.25, 1.15],
+  ];
+  pillarPositions.forEach(pos => {
+    const pillar = new THREE.Mesh(pillarGeo, blackPart);
+    pillar.position.set(pos[0], pos[1], pos[2]);
+    pillar.castShadow = true;
+    tukTuk.add(pillar);
+  });
+
+  // ============ الزجاج ============
+  // الزجاج الأمامي (Windshield)
+  const windshieldGeo = new THREE.BoxGeometry(1.28, 0.9, 0.04);
+  const windshield = new THREE.Mesh(windshieldGeo, glassMat);
+  windshield.position.set(0, 1.88, 1.28);
+  windshield.rotation.x = -0.1;
+  tukTuk.add(windshield);
+
+  // زجاج المقصورة الأمامية (يمين وشمال)
+  const sideGlassGeo = new THREE.BoxGeometry(0.04, 0.85, 1.0);
+  const sideGlassL = new THREE.Mesh(sideGlassGeo, glassMat);
+  sideGlassL.position.set(-0.69, 1.85, 0.7);
+  tukTuk.add(sideGlassL);
+
+  const sideGlassR = new THREE.Mesh(sideGlassGeo, glassMat);
+  sideGlassR.position.set(0.69, 1.85, 0.7);
+  tukTuk.add(sideGlassR);
+
+  // زجاج المقصورة الخلفية
+  const rearGlassSideGeo = new THREE.BoxGeometry(0.04, 1.0, 1.35);
+  const rearGlassL = new THREE.Mesh(rearGlassSideGeo, glassMat);
+  rearGlassL.position.set(-0.71, 1.75, -0.65);
+  tukTuk.add(rearGlassL);
+
+  const rearGlassR = new THREE.Mesh(rearGlassSideGeo, glassMat);
+  rearGlassR.position.set(0.71, 1.75, -0.65);
+  tukTuk.add(rearGlassR);
+
+  // الزجاج الخلفي
+  const rearWindowGeo = new THREE.BoxGeometry(1.35, 1.05, 0.04);
+  const rearWindow = new THREE.Mesh(rearWindowGeo, glassMat);
+  rearWindow.position.set(0, 1.75, -1.41);
+  tukTuk.add(rearWindow);
+
+  // ============ الشبكة الأمامية ============
+  const grillFrameGeo = new THREE.BoxGeometry(0.9, 0.35, 0.06);
+  const grillFrame = new THREE.Mesh(grillFrameGeo, chromeMat);
+  grillFrame.position.set(0, 1.0, 1.37);
+  tukTuk.add(grillFrame);
+
+  // شرائح الشبكة
+  for (let i = 0; i < 5; i++) {
+    const slatGeo = new THREE.BoxGeometry(0.85, 0.04, 0.04);
+    const slat = new THREE.Mesh(slatGeo, blackPart);
+    slat.position.set(0, 0.88 + i * 0.06, 1.4);
+    tukTuk.add(slat);
+  }
+
+  // ============ المصابيح الأمامية ============
+  const headlightGeo = new THREE.CylinderGeometry(0.13, 0.13, 0.1, 20);
+  
+  const hl1 = new THREE.Mesh(headlightGeo, chromeMat);
+  hl1.rotation.x = Math.PI / 2;
+  hl1.position.set(-0.48, 1.2, 1.35);
+  hl1.castShadow = true;
+  tukTuk.add(hl1);
+
+  const hl1Glass = new THREE.Mesh(headlightGeo, headlightMat);
+  hl1Glass.rotation.x = Math.PI / 2;
+  hl1Glass.position.set(-0.48, 1.2, 1.38);
+  tukTuk.add(hl1Glass);
+
+  const hl2 = new THREE.Mesh(headlightGeo, chromeMat);
+  hl2.rotation.x = Math.PI / 2;
+  hl2.position.set(0.48, 1.2, 1.35);
+  hl2.castShadow = true;
+  tukTuk.add(hl2);
+
+  const hl2Glass = new THREE.Mesh(headlightGeo, headlightMat);
+  hl2Glass.rotation.x = Math.PI / 2;
+  hl2Glass.position.set(0.48, 1.2, 1.38);
+  tukTuk.add(hl2Glass);
+
+  // ============ الفوانيس الخلفية ============
+  const taillightGeo = new THREE.BoxGeometry(0.14, 0.22, 0.06);
+  
+  const tl1 = new THREE.Mesh(taillightGeo, taillightMat);
+  tl1.position.set(-0.52, 0.95, -1.42);
+  tukTuk.add(tl1);
+
+  const tl2 = new THREE.Mesh(taillightGeo, taillightMat);
+  tl2.position.set(0.52, 0.95, -1.42);
+  tukTuk.add(tl2);
+
+  // ============ لوحة الأرقام ============
+  const plateGeo = new THREE.BoxGeometry(0.55, 0.16, 0.03);
+  const plateMat = new THREE.MeshStandardMaterial({
+    color: 0xffffff,
+    roughness: 0.5,
+    metalness: 0.1,
+  });
+  const plate = new THREE.Mesh(plateGeo, plateMat);
+  plate.position.set(0, 0.68, -1.43);
+  tukTuk.add(plate);
+
+  // لوحة أمامية
+  const frontPlate = new THREE.Mesh(plateGeo, plateMat);
+  frontPlate.position.set(0, 0.68, 1.42);
+  frontPlate.rotation.y = Math.PI;
+  tukTuk.add(frontPlate);
+
+  // ============ الزخارف ============
+  // خطوط كروم على الجانبين
+  const trimGeo = new THREE.BoxGeometry(0.02, 0.06, 2.3);
+  const trimL = new THREE.Mesh(trimGeo, chromeMat);
+  trimL.position.set(-0.71, 1.5, -0.1);
+  tukTuk.add(trimL);
+
+  const trimR = new THREE.Mesh(trimGeo, chromeMat);
+  trimR.position.set(0.71, 1.5, -0.1);
+  tukTuk.add(trimR);
+
+  // ============ المقود ============
+  const steeringGroup = new THREE.Group();
+  
+  // حلقة المقود
+  const steeringRingGeo = new THREE.TorusGeometry(0.16, 0.022, 8, 24);
+  const steeringRing = new THREE.Mesh(steeringRingGeo, blackPart);
+  steeringRing.castShadow = true;
+  steeringGroup.add(steeringRing);
+
+  // 3 أذرع
+  for (let i = 0; i < 3; i++) {
+    const spokeGeo = new THREE.BoxGeometry(0.025, 0.15, 0.02);
+    const spoke = new THREE.Mesh(spokeGeo, blackPart);
+    spoke.rotation.z = (i / 3) * Math.PI * 2;
+    steeringGroup.add(spoke);
+  }
+
+  // المركز
+  const hubGeo = new THREE.CylinderGeometry(0.045, 0.045, 0.04);
+  const hub = new THREE.Mesh(hubGeo, blackPart);
+  hub.rotation.x = Math.PI / 2;
+  steeringGroup.add(hub);
+
+  // عمود المقود
+  const columnGeo = new THREE.CylinderGeometry(0.025, 0.025, 0.35);
+  const column = new THREE.Mesh(columnGeo, blackPart);
+  column.rotation.x = -0.55;
+  column.position.set(0, -0.14, 0.12);
+  steeringGroup.add(column);
+
+  steeringGroup.position.set(0, 1.55, 0.9);
+  steeringGroup.rotation.x = -0.35;
+  tukTuk.add(steeringGroup);
+
+  // ============ لوحة القيادة ============
+  const dashGeo = new THREE.BoxGeometry(1.25, 0.22, 0.35);
+  const dashboard = new THREE.Mesh(dashGeo, dashMat);
+  dashboard.position.set(0, 1.32, 1.08);
+  dashboard.castShadow = true;
+  tukTuk.add(dashboard);
+
+  // العدادات
+  const gaugeMat = new THREE.MeshStandardMaterial({
+    color: 0x111111,
+    roughness: 0.3,
+    metalness: 0.5,
+  });
+  const gaugeGeo = new THREE.CircleGeometry(0.07, 20);
+  for (let i = 0; i < 3; i++) {
+    const gauge = new THREE.Mesh(gaugeGeo, gaugeMat);
+    gauge.position.set(-0.35 + i * 0.35, 1.36, 1.26);
+    tukTuk.add(gauge);
+  }
+
+  // ============ المرايا الجانبية ============
+  const mirrorCaseMat = new THREE.MeshStandardMaterial({
+    color: 0x333333,
+    roughness: 0.6,
+    metalness: 0.4,
+  });
+  const mirrorGlassMat = new THREE.MeshStandardMaterial({
+    color: 0xaaccdd,
+    roughness: 0.05,
+    metalness: 0.95,
+  });
+
+  // المرآة اليمنى
+  const mirrorRGroup = new THREE.Group();
+  const mirrorStemR = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.015, 0.015, 0.25),
+    blackPart
+  );
+  mirrorStemR.rotation.z = Math.PI / 3;
+  mirrorStemR.position.set(-0.1, 0.05, 0);
+  mirrorRGroup.add(mirrorStemR);
+  
+  const mirrorCaseR = new THREE.Mesh(
+    new THREE.BoxGeometry(0.14, 0.1, 0.03),
+    mirrorCaseMat
+  );
+  mirrorCaseR.position.set(-0.2, 0.15, 0);
+  mirrorRGroup.add(mirrorCaseR);
+  
+  const mirrorGlassR = new THREE.Mesh(
+    new THREE.BoxGeometry(0.11, 0.08, 0.01),
+    mirrorGlassMat
+  );
+  mirrorGlassR.position.set(-0.2, 0.15, 0.02);
+  mirrorRGroup.add(mirrorGlassR);
+  
+  mirrorRGroup.position.set(0.7, 1.9, 1.15);
+  tukTuk.add(mirrorRGroup);
+
+  // المرآة اليسرى
+  const mirrorLGroup = mirrorRGroup.clone();
+  mirrorLGroup.position.set(-0.7, 1.9, 1.15);
+  mirrorLGroup.scale.x = -1;
+  tukTuk.add(mirrorLGroup);
+
+  // ============ المقاعد ============
+  // مقعد السائق
+  const seatDriverGeo = new THREE.BoxGeometry(0.55, 0.12, 0.5);
+  const seatDriver = new THREE.Mesh(seatDriverGeo, seatMat);
+  seatDriver.position.set(0, 0.8, 0.4);
+  seatDriver.castShadow = true;
+  tukTuk.add(seatDriver);
+
+  // مسند ظهر السائق
+  const backDriverGeo = new THREE.BoxGeometry(0.55, 0.55, 0.08);
+  const backDriver = new THREE.Mesh(backDriverGeo, seatMat);
+  backDriver.position.set(0, 1.12, 0.16);
+  backDriver.castShadow = true;
+  tukTuk.add(backDriver);
+
+  // المقعد الخلفي (عريض)
+  const rearSeatGeo = new THREE.BoxGeometry(1.25, 0.12, 0.55);
+  const rearSeat = new THREE.Mesh(rearSeatGeo, seatMat);
+  rearSeat.position.set(0, 0.8, -0.75);
+  rearSeat.castShadow = true;
+  tukTuk.add(rearSeat);
+
+  // مسند ظهر المقعد الخلفي
+  const rearBackGeo = new THREE.BoxGeometry(1.25, 0.65, 0.08);
+  const rearBack = new THREE.Mesh(rearBackGeo, seatMat);
+  rearBack.position.set(0, 1.18, -1.05);
+  rearBack.castShadow = true;
+  tukTuk.add(rearBack);
+
+  // ============ العجلات ============
+  const wheels = [];
+  
+  function createWheel(x, z, isFront) {
+    const wheelGroup = new THREE.Group();
+    wheelGroup.userData.isFront = isFront;
+
+    // الإطار (Torus)
+    const tireGeo = new THREE.TorusGeometry(0.26, 0.11, 12, 24);
+    const tire = new THREE.Mesh(tireGeo, rubberMat);
+    tire.rotation.y = Math.PI / 2;
+    tire.castShadow = true;
+    tire.receiveShadow = true;
+    wheelGroup.add(tire);
+
+    // الجنط
+    const rimGeo = new THREE.CylinderGeometry(0.17, 0.17, 0.13, 12);
+    const rim = new THREE.Mesh(rimGeo, rimMat);
+    rim.rotation.z = Math.PI / 2;
+    rim.castShadow = true;
+    wheelGroup.add(rim);
+
+    // براغي الجنط
+    const boltGeo = new THREE.SphereGeometry(0.025, 6, 6);
+    for (let i = 0; i < 5; i++) {
+      const bolt = new THREE.Mesh(boltGeo, blackPart);
+      const angle = (i / 5) * Math.PI * 2;
+      bolt.position.set(0, Math.cos(angle) * 0.08, Math.sin(angle) * 0.08);
+      bolt.castShadow = true;
+      wheelGroup.add(bolt);
+    }
+
+    // مركز الجنط
+    const centerCap = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.04, 0.04, 0.15, 12),
+      chromeMat
+    );
+    centerCap.rotation.z = Math.PI / 2;
+    wheelGroup.add(centerCap);
+
+    wheelGroup.position.set(x, 0.26, z);
+    tukTuk.add(wheelGroup);
+    wheels.push(wheelGroup);
+
+    return wheelGroup;
+  }
+
+  // العجلة الأمامية الواحدة
+  const frontWheel = createWheel(0, 1.25, true);
+  
+  // العجلتان الخلفيتان
+  const rearLeftWheel = createWheel(-0.68, -0.85, false);
+  const rearRightWheel = createWheel(0.68, -0.85, false);
+
+  // ============ الإضاءة الفعلية للمصابيح ============
+  const headlight = new THREE.SpotLight(
+    0xfff5cc,    // اللون
+    4,           // الشدة
+    35,          // المدى
+    Math.PI / 5, // زاوية المخروط
+    0.4,         // Penumbra
+    1.5          // Decay
+  );
+  headlight.position.set(0, 1.2, 1.3);
+  headlight.target.position.set(0, 0.3, 15);
+  headlight.castShadow = false;
+  tukTuk.add(headlight);
+  tukTuk.add(headlight.target);
+
+  // ============ تخزين المراجع ============
+  tukTuk.userData = {
+    wheels,
+    frontWheel,
+    rearLeftWheel,
+    rearRightWheel,
+    steeringWheel: steeringGroup,
+    headlight,
+  };
+
+  // حجم التوك توك الفعلي
+  tukTuk.scale.set(1, 1, 1);
+
+  return tukTuk;
+}
+
+/* ============================================================
+   إنشاء التوك توك وإضافته للمشهد
+   ============================================================ */
+const tukTuk = createTukTuk();
+tukTuk.position.set(0, 0, 200);
+tukTuk.rotation.y = 0;
+scene.add(tukTuk);
+
+/* ============================================================
+   حالة اللاعب / السائق
+   ============================================================ */
+const player = {
+  // فيزياء التوك توك
+  speed: 0,                 // السرعة الحالية (م/ث)
+  maxSpeed: CONFIG.maxSpeed,
+  maxReverseSpeed: CONFIG.maxReverseSpeed,
+  acceleration: CONFIG.acceleration,
+  braking: CONFIG.braking,
+  friction: CONFIG.friction,
+  
+  // المقود
+  steering: 0,              // -1 إلى 1
+  currentWheelAngle: 0,
+  
+  // حالة
+  isLocked: false,
+  engineOn: true,
+  handbrake: false,
+  
+  // كاميرا
+  headYaw: 0,
+  headPitch: 0,
+  
+  // حالة إضافية
+  isOnWetRoad: false,
+  driftAmount: 0,
+};
+
+/* ============================================================
+   إعدادات الكاميرا داخل الكابينة
+   ============================================================ */
+const CAMERA_OFFSET = new THREE.Vector3(
+  0,      // x
+  1.55,   // y - ارتفاع نظر السائق
+  0.15    // z - للأمام شوي
+);
+
+/* ============================================================
+   المدخلات - لوحة المفاتيح
+   ============================================================ */
+const keys = {};
+
+window.addEventListener('keydown', (e) => {
+  keys[e.code] = true;
+  
+  // منع السلوك الافتراضي
+  if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Tab'].includes(e.code)) {
+    e.preventDefault();
+  }
+  
+  // فرملة اليد
+  if (e.code === 'Space') {
+    player.handbrake = true;
+  }
+  
+  // تشغيل/إطفاء المحرك
+  if (e.code === 'KeyE') {
+    player.engineOn = !player.engineOn;
+    if (typeof AudioSystem !== 'undefined') {
+      AudioSystem.setEngine(player.engineOn);
+    }
+    UI.showToast(player.engineOn ? '🔊 المحرك شغّال' : '🔇 المحرك مطفأ', 1000);
+  }
+  
+  // إعادة تعيين الكاميرا
+  if (e.code === 'KeyR') {
+    player.headYaw = 0;
+    player.headPitch = 0;
+  }
+});
+
+window.addEventListener('keyup', (e) => {
+  keys[e.code] = false;
+  
+  if (e.code === 'Space') {
+    player.handbrake = false;
+  }
+});
+
+/* ============================================================
+   المدخلات - الماوس (دوران الرأس على الكمبيوتر)
+   ============================================================ */
+let isPointerLocked = false;
+
+function setupPointerLock() {
+  if (isMobile) return; // الموبايل يستخدم أزرار لمس
+  
+  document.addEventListener('pointerlockchange', () => {
+    isPointerLocked = document.pointerLockElement === renderer.domElement;
+    player.isLocked = isPointerLocked;
+  });
+  
+  document.addEventListener('mousemove', (e) => {
+    if (!isPointerLocked) return;
+    
+    player.headYaw -= e.movementX * 0.002;
+    player.headPitch -= e.movementY * 0.002;
+    
+    // حدود دوران الرأس
+    player.headYaw = Utils.clamp(player.headYaw, -Math.PI * 0.75, Math.PI * 0.75);
+    player.headPitch = Utils.clamp(player.headPitch, -0.55, 0.45);
+  });
+}
+
+/* ============================================================
+   فيزياء التوك توك - نظام القيادة الكامل
+   ============================================================ */
+function updateTukTukPhysics(dt) {
+  // تجاهل لو اللعبة مش شغالة
+  if (!player.isLocked && !isMobile) return;
+  if (!gameState || !gameState.running) return;
+
+  const mobileInput = getMobileInput();
+
+  // ============ 1. التسارع والفرملة ============
+  const throttle = (keys['KeyW'] || keys['ArrowUp'] || mobileInput.accel) ? 1 : 0;
+  const brake = (keys['KeyS'] || keys['ArrowDown'] || mobileInput.brake) ? 1 : 0;
+
+  if (!player.engineOn) {
+    // المحرك مطفي - تباطؤ سريع
+    player.speed *= (1 - 3 * dt);
+    if (Math.abs(player.speed) < 0.1) player.speed = 0;
+  } else if (player.handbrake) {
+    // فرملة اليد
+    player.speed *= (1 - 10 * dt);
+    if (Math.abs(player.speed) < 0.1) player.speed = 0;
+  } else {
+    if (throttle && !brake) {
+      // تسارع
+      const currentAccel = player.acceleration * (1 - Math.abs(player.speed) / player.maxSpeed * 0.4);
+      player.speed += currentAccel * dt;
+    } else if (brake && !throttle) {
+      // فرملة أو رجوع
+      if (player.speed > 0.5) {
+        player.speed -= player.braking * dt;
+      } else {
+        player.speed -= player.acceleration * 0.6 * dt;
+      }
+    } else {
+      // احتكاك طبيعي
+      if (player.speed > 0) {
+        player.speed -= player.friction * dt * 4;
+        if (player.speed < 0.05) player.speed = 0;
+      } else if (player.speed < 0) {
+        player.speed += player.friction * dt * 4;
+        if (player.speed > -0.05) player.speed = 0;
+      }
+    }
+    
+    // حدود السرعة
+    player.speed = Utils.clamp(player.speed, -player.maxReverseSpeed, player.maxSpeed);
+  }
+
+  // ============ 2. التحكم في المقود ============
+  const leftInput = (keys['KeyA'] || keys['ArrowLeft'] || mobileInput.left) ? 1 : 0;
+  const rightInput = (keys['KeyD'] || keys['ArrowRight'] || mobileInput.right) ? 1 : 0;
+  const steerInput = rightInput - leftInput;
+
+  // المقود بيتحرك بنعومة
+  const steerTargetSpeed = CONFIG.steeringSpeed;
+  const steerDiff = steerInput - player.steering;
+  const steerStep = Math.sign(steerDiff) * Math.min(Math.abs(steerDiff), steerTargetSpeed * dt);
+  player.steering += steerStep;
+  player.steering = Utils.clamp(player.steering, -1, 1);
+
+  // إذا مفيش ضغط، المقود يرجع للمنتصف تدريجياً
+  if (steerInput === 0) {
+    player.steering *= (1 - 2 * dt);
+  }
+
+  // زاوية العجلة الأمامية
+  const speedRatio = Math.min(Math.abs(player.speed) / player.maxSpeed, 1);
+  const maxAngle = CONFIG.maxWheelAngle * (1 - speedRatio * 0.55);
+  player.currentWheelAngle = player.steering * maxAngle;
+
+  // ============ 3. دوران التوك توك ============
+  if (Math.abs(player.speed) > 0.1) {
+    const speedFactor = Math.min(Math.abs(player.speed) / 8, 1.2);
+    const direction = player.speed >= 0 ? 1 : -1;
+    const turnRate = player.currentWheelAngle * speedFactor * dt * 3.2 * direction;
+    tukTuk.rotation.y -= turnRate;
+  }
+
+  // ============ 4. تحديث الموقع مع التصادم ============
+  const forward = new THREE.Vector3(
+    Math.sin(tukTuk.rotation.y),
+    0,
+    Math.cos(tukTuk.rotation.y)
+  );
+
+  const velocity = forward.clone().multiplyScalar(player.speed * dt);
+  const newPos = tukTuk.position.clone().add(velocity);
+
+  // التصادم مع الترعة
+  const inCanalX = !(newPos.x > -15 && newPos.x < 15); // عبر الجسر في المنتصف
+  const nearCanal = Math.abs(newPos.z) < CONFIG.canalWidth / 2 + 1.5;
+  
+  if (nearCanal && inCanalX) {
+    // اصطدام بالترعة
+    player.speed *= -0.25;
+    // اهتزاز بسيط
+    tukTuk.position.y = 0.08;
+  } else if (Math.abs(newPos.x) < CONFIG.citySize / 2 - 5 && 
+             Math.abs(newPos.z) < CONFIG.citySize / 2 - 5) {
+    tukTuk.position.copy(newPos);
+  } else {
+    // حدود المدينة
+    player.speed *= -0.3;
+  }
+
+  // ============ 5. تحديث العجلات ============
+  const wheelRollSpeed = (player.speed * dt) / 0.28;
+  tukTuk.userData.wheels.forEach(wheel => {
+    const tire = wheel.children[0];
+    if (tire) {
+      tire.rotation.x += wheelRollSpeed;
+    }
+    if (wheel.children[1]) {
+      wheel.children[1].rotation.x += wheelRollSpeed;
+    }
+    
+    // العجلة الأمامية بتلف مع المقود
+    if (wheel.userData.isFront) {
+      wheel.rotation.y = player.currentWheelAngle;
+    }
+  });
+
+  // ============ 6. تحديث المقود ============
+  tukTuk.userData.steeringWheel.rotation.z = -player.steering * Math.PI * 0.85;
+
+  // ============ 7. الاهتزاز والإمالة ============
+  // اهتزاز المحرك
+  let engineShake = 0;
+  if (player.engineOn) {
+    engineShake = Math.sin(performance.now() * 0.015) * 0.008 * (1 + speedRatio);
+  }
+  tukTuk.position.y = Math.max(0, engineShake);
+  
+  // إمالة عند الدوران
+  const targetRoll = -player.steering * 0.06 * speedRatio;
+  tukTuk.rotation.z += (targetRoll - tukTuk.rotation.z) * 6 * dt;
+  
+  // إمالة أمامية/خلفية عند التسارع/الفرملة
+  const targetPitch = (throttle - brake) * -0.015;
+  tukTuk.rotation.x += (targetPitch - tukTuk.rotation.x) * 6 * dt;
+
+  // ============ 8. انزلاق العجلات ============
+  if (Math.abs(player.steering) > 0.7 && Math.abs(player.speed) > 10) {
+    player.driftAmount = Math.min(player.driftAmount + dt * 2, 1);
+  } else {
+    player.driftAmount = Math.max(player.driftAmount - dt * 3, 0);
+  }
+}
+
+/* ============================================================
+   تحديث الكاميرا داخل الكابينة
+   ============================================================ */
+function updateCamera(dt) {
+  // حساب موقع الكاميرا بناءً على موضع التوك توك
+  const offset = CAMERA_OFFSET.clone();
+  offset.applyAxisAngle(new THREE.Vector3(0, 1, 0), tukTuk.rotation.y);
+  
+  const targetPos = tukTuk.position.clone().add(offset);
+  targetPos.y += tukTuk.position.y;
+  
+  // ناعم الحركة
+  camera.position.lerp(targetPos, 1 - Math.pow(0.001, dt));
+  
+  // اتجاه النظر
+  const baseYaw = tukTuk.rotation.y + Math.PI;
+  const totalYaw = baseYaw + player.headYaw;
+  const totalPitch = player.headPitch;
+  
+  const lookDir = new THREE.Vector3(
+    Math.sin(totalYaw) * Math.cos(totalPitch),
+    Math.sin(totalPitch),
+    Math.cos(totalYaw) * Math.cos(totalPitch)
+  );
+  
+  const lookTarget = camera.position.clone().add(lookDir);
+  camera.lookAt(lookTarget);
+  
+  // إمالة الكاميرا عند الدوران
+  camera.rotation.z = -player.steering * 0.025 * speedRatio();
+  
+  // اهتزاز الكاميرا مع المحرك
+  if (player.engineOn) {
+    const shake = 0.003 * (1 + speedRatio());
+    camera.position.x += Math.sin(performance.now() * 0.02) * shake;
+    camera.position.y += Math.cos(performance.now() * 0.025) * shake;
+  }
+}
+
+function speedRatio() {
+  return Math.min(Math.abs(player.speed) / player.maxSpeed, 1);
+}
+
+/* ============================================================
+   تعليمات شاشة الموبايل
+   ============================================================ */
+const mobileInput = {
+  accel: false,
+  brake: false,
+  left: false,
+  right: false,
+  handbrake: false,
+};
+
+function getMobileInput() {
+  return mobileInput;
+}
+
+/* ============================================================
+   إدارة أزرار اللمس
+   ============================================================ */
+function setupMobileButtons() {
+  const buttons = {
+    btnAccel: 'accel',
+    btnBrake: 'brake',
+    btnSteerLeft: 'left',
+    btnSteerRight: 'right',
+    btnHandbrake: 'handbrake',
+  };
+  
+  Object.entries(buttons).forEach(([id, key]) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    
+    const press = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      mobileInput[key] = true;
+      el.classList.add('pressed');
+      
+      if (key === 'handbrake') {
+        player.handbrake = true;
+      }
+    };
+    
+    const release = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      mobileInput[key] = false;
+      el.classList.remove('pressed');
+      
+      if (key === 'handbrake') {
+        player.handbrake = false;
+      }
+    };
+    
+    el.addEventListener('touchstart', press, { passive: false });
+    el.addEventListener('touchend', release, { passive: false });
+    el.addEventListener('touchcancel', release, { passive: false });
+    el.addEventListener('mousedown', press);
+    el.addEventListener('mouseup', release);
+    el.addEventListener('mouseleave', release);
+  });
+}
+
+/* ============================================================
+   المزامنة مع حالة اللعبة (يتم تعريفها في الجزء 3)
+   ============================================================ */
+let gameState = null;
+
+function setGameState(gs) {
+  gameState = gs;
+}
+
+/* ============================================================
+   متغير توافقي (يتم استبداله في الجزء 3)
+   ============================================================ */
+const AudioSystem = {
+  setEngine: () => {},
+};
+
+/* ============================================================
+   تصدير للجزء الثالث
+   ============================================================ */
+export {
+  tukTuk,
+  player,
+  keys,
+  mobileInput,
+  updateTukTukPhysics,
+  updateCamera,
+  setupMobileButtons,
+  setupPointerLock,
+  setGameState,
+};
+
+console.log('✅ الجزء 2 جاهز - التوك توك ونظام القيادة');
