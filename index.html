@@ -929,6 +929,142 @@ html, body {
 
 <script src="https://cdn.jsdelivr.net/npm/three@0.140.0/build/three.min.js"></script>
 <script src="game.js"></script>
-
+<script>
+// ═══════════════════════════════════════════════════
+// 🎬 سكريبت إدارة الشاشات (Loading → Start → Game)
+// ═══════════════════════════════════════════════════
+(function() {
+  'use strict';
+  
+  function showStartScreen() {
+    var loadingScreen = document.getElementById('loadingScreen');
+    var startScreen = document.getElementById('startScreen');
+    
+    if (loadingScreen) loadingScreen.classList.add('hidden');
+    if (startScreen) startScreen.classList.add('visible');
+    
+    console.log('🎬 شاشة البداية ظهرت');
+  }
+  
+  function hideStartScreen() {
+    var startScreen = document.getElementById('startScreen');
+    if (startScreen) startScreen.classList.remove('visible');
+    console.log('🎮 شاشة البداية اتخفت');
+  }
+  
+  function showHUD() {
+    var hud = document.getElementById('hud');
+    if (hud) hud.classList.add('visible');
+    
+    var missionPanel = document.getElementById('missionPanel');
+    if (missionPanel) missionPanel.classList.add('visible');
+    
+    var pauseBtn = document.getElementById('pauseBtn');
+    if (pauseBtn) pauseBtn.style.display = 'flex';
+    
+    var radioBtn = document.getElementById('radioBtn');
+    if (radioBtn) radioBtn.style.display = 'flex';
+    
+    var fullscreenBtn = document.getElementById('fullscreenBtn');
+    if (fullscreenBtn) fullscreenBtn.style.display = 'flex';
+  }
+  
+  function showControls() {
+    var controls = document.getElementById('controls');
+    var isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    
+    if (controls && isMobile) controls.classList.add('visible');
+  }
+  
+  // ننتظر لحد ما اللعبة تتحمل
+  var checkInterval = setInterval(function() {
+    // لو اللعبة اتحملت (الدوال موجودة)
+    if (typeof window.buildCity !== 'undefined' && typeof window.startGame !== 'undefined') {
+      clearInterval(checkInterval);
+      
+      // أخفي شاشة التحميل واعرض شاشة البداية
+      setTimeout(function() {
+        showStartScreen();
+        
+        // اربط زر البداية
+        var startBtn = document.getElementById('startBtn');
+        if (startBtn) {
+          startBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            hideStartScreen();
+            showHUD();
+            showControls();
+            
+            if (typeof window.startGame === 'function') {
+              window.startGame();
+            }
+          });
+        }
+        
+        // اربط زر إعادة اللعب
+        var restartBtn = document.getElementById('restartBtn');
+        if (restartBtn) {
+          restartBtn.addEventListener('click', function() {
+            var endScreen = document.getElementById('endScreen');
+            if (endScreen) endScreen.classList.remove('visible');
+            
+            if (typeof window.startGame === 'function') {
+              window.startGame();
+            }
+          });
+        }
+        
+        // اربط زر الإيقاف
+        var pauseBtn = document.getElementById('pauseBtn');
+        if (pauseBtn) {
+          pauseBtn.addEventListener('click', function() {
+            if (window.gameState && window.gameState.running) {
+              // togglePause مش مكشوفة، بس نقدر نستدعيها بشكل غير مباشر
+              document.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyP' }));
+            }
+          });
+        }
+        
+        // اربط زر ملء الشاشة
+        var fullscreenBtn = document.getElementById('fullscreenBtn');
+        if (fullscreenBtn) {
+          fullscreenBtn.addEventListener('click', function() {
+            if (!document.fullscreenElement) {
+              document.documentElement.requestFullscreen().catch(function() {});
+            } else {
+              document.exitFullscreen().catch(function() {});
+            }
+          });
+        }
+        
+        // اربط زر الراديو
+        var radioBtn = document.getElementById('radioBtn');
+        if (radioBtn) {
+          radioBtn.addEventListener('click', function() {
+            var radioPanel = document.getElementById('radioPanel');
+            if (radioPanel) {
+              radioPanel.classList.toggle('visible');
+              radioBtn.classList.toggle('active');
+            }
+          });
+        }
+        
+      }, 300);
+    }
+  }, 100);
+  
+  // لو اتأخرت أكتر من 30 ثانية، نظهر رسالة
+  setTimeout(function() {
+    if (typeof window.buildCity === 'undefined') {
+      var loadingText = document.getElementById('loadingText');
+      if (loadingText) {
+        loadingText.textContent = '⚠️ اللعبة بتاخد وقت طويل...';
+        loadingText.style.color = '#ff4444';
+      }
+    }
+  }, 30000);
+  
+})();
+</script>
 </body>
 </html>
