@@ -2138,3 +2138,1111 @@ export {
 };
 
 console.log('✅ الجزء 2 جاهز - التوك توك ونظام القيادة');
+/* ============================================================
+   🛺 الجزء 3: الركاب + المهام + الأصوات + الحلقة الرئيسية
+   ============================================================ */
+
+/* ============================================================
+   مواقع الوجهات الحقيقية في كفر الدوار
+   (بناءً على بيانات الوحدة المحلية)
+   ============================================================ */
+const DESTINATIONS_DATA = [
+  {
+    name: 'محطة قطار كفر الدوار',
+    x: -350,
+    z: -50,
+    icon: '🚂',
+    color: 0x8b4513,
+    description: 'محطة القطار الرئيسية',
+  },
+  {
+    name: 'موقف عزيز المصري',
+    x: 200,
+    z: 80,
+    icon: '🚌',
+    color: 0xe74c3c,
+    description: 'أكبر موقف في المدينة',
+  },
+  {
+    name: 'مجمع الميزانة',
+    x: -150,
+    z: -60,
+    icon: '🚐',
+    color: 0xf39c12,
+    description: 'موقف شمال الترعة',
+  },
+  {
+    name: 'مجمع السعرانية',
+    x: 450,
+    z: 100,
+    icon: '🚕',
+    color: 0xe67e22,
+    description: 'موقف شرق المدينة',
+  },
+  {
+    name: 'مستشفى كفر الدوار العام',
+    x: -700,
+    z: 150,
+    icon: '🏥',
+    color: 0x3498db,
+    description: 'المستشفى العام',
+  },
+  {
+    name: 'شركة مصر للغزل والنسيج',
+    x: 500,
+    z: -400,
+    icon: '🏭',
+    color: 0x95a5a6,
+    description: 'أكبر شركة في المدينة',
+  },
+  {
+    name: 'المسجد الكبير',
+    x: -200,
+    z: 250,
+    icon: '🕌',
+    color: 0x16a085,
+    description: 'جامع كفر الدوار الكبير',
+  },
+  {
+    name: 'سوق كفر الدوار التجاري',
+    x: 100,
+    z: 200,
+    icon: '🛒',
+    color: 0x9b59b6,
+    description: 'السوق الرئيسي',
+  },
+  {
+    name: 'كورنيش ترعة المحمودية',
+    x: 600,
+    z: -20,
+    icon: '🌊',
+    color: 0x2980b9,
+    description: 'على ضفاف الترعة',
+  },
+  {
+    name: 'جامعة كفر الدوار',
+    x: -500,
+    z: -300,
+    icon: '🎓',
+    color: 0x8e44ad,
+    description: 'الجامعة الجديدة',
+  },
+];
+
+/* ============================================================
+   نظام الأصوات - Web Audio API
+   ============================================================ */
+const AudioSystem = {
+  ctx: null,
+  engineOsc: null,
+  engineGain: null,
+  engineFilter: null,
+  enabled: true,
+  initialized: false,
+  
+  init() {
+    if (this.initialized) return;
+    try {
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      this.ctx = new AudioContext();
+      this.initialized = true;
+      console.log('🔊 نظام الصوت جاهز');
+    } catch (e) {
+      console.warn('⚠️ فشل تشغيل الصوت:', e);
+      this.enabled = false;
+    }
+  },
+  
+  resume() {
+    if (this.ctx && this.ctx.state === 'suspended') {
+      this.ctx.resume();
+    }
+  },
+  
+  startEngine() {
+    if (!this.enabled || !this.ctx) return;
+    if (this.engineOsc) return;
+    
+    try {
+      // صوت المحرك الأساسي
+      this.engineOsc = this.ctx.createOscillator();
+      this.engineOsc.type = 'sawtooth';
+      this.engineOsc.frequency.value = 55;
+      
+      // فلتر Lowpass عشان الصوت يبقى ناعم
+      this.engineFilter = this.ctx.createBiquadFilter();
+      this.engineFilter.type = 'lowpass';
+      this.engineFilter.frequency.value = 350;
+      this.engineFilter.Q.value = 5;
+      
+      // التحكم في مستوى الصوت
+      this.engineGain = this.ctx.createGain();
+      this.engineGain.gain.value = 0.05;
+      
+      this.engineOsc.connect(this.engineFilter);
+      this.engineFilter.connect(this.engineGain);
+      this.engineGain.connect(this.ctx.destination);
+      
+      this.engineOsc.start();
+    } catch (e) {
+      console.warn('خطأ في بدء صوت المحرك:', e);
+    }
+  },
+  
+  stopEngine() {
+    if (this.engineOsc) {
+      try {
+        this.engineOsc.stop();
+      } catch (e) {}
+      this.engineOsc = null;
+      this.engineGain = null;
+      this.engineFilter = null;
+    }
+  },
+  
+  setEngine(on) {
+    if (on) {
+      this.resume();
+      this.startEngine();
+    } else {
+      this.stopEngine();
+    }
+  },
+  
+  updateEngine(speed, maxSpeed, isAccelerating) {
+    if (!this.engineOsc || !this.engineGain) return;
+    
+    const ratio = Math.min(Math.abs(speed) / maxSpeed, 1);
+    const baseFreq = 55;
+    const maxFreq = 180;
+    
+    // تردد المحرك يزيد مع السرعة
+    this.engineOsc.frequency.setTargetAtTime(
+      baseFreq + ratio * (maxFreq - baseFreq),
+      this.ctx.currentTime,
+      0.1
+    );
+    
+    // مستوى الصوت
+    const targetGain = 0.03 + ratio * 0.12 + (isAccelerating ? 0.03 : 0);
+    this.engineGain.gain.setTargetAtTime(
+      targetGain,
+      this.ctx.currentTime,
+      0.15
+    );
+    
+    // فلتر يتغير مع السرعة
+    this.engineFilter.frequency.setTargetAtTime(
+      300 + ratio * 800,
+      this.ctx.currentTime,
+      0.1
+    );
+  },
+  
+  playPickup() {
+    if (!this.enabled || !this.ctx) return;
+    this._playTone(600, 900, 0.15, 'sine', 0.15);
+  },
+  
+  playDelivery() {
+    if (!this.enabled || !this.ctx) return;
+    // نغمة صاعدة جميلة
+    this._playTone(523, 523, 0.1, 'sine', 0.15);
+    setTimeout(() => this._playTone(659, 659, 0.1, 'sine', 0.15), 100);
+    setTimeout(() => this._playTone(784, 784, 0.2, 'sine', 0.15), 200);
+  },
+  
+  playError() {
+    if (!this.enabled || !this.ctx) return;
+    this._playTone(200, 150, 0.2, 'sawtooth', 0.12);
+  },
+  
+  playHonk() {
+    if (!this.enabled || !this.ctx) return;
+    this._playTone(440, 440, 0.3, 'square', 0.1);
+  },
+  
+  _playTone(startFreq, endFreq, duration, type = 'sine', volume = 0.15) {
+    try {
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      
+      osc.type = type;
+      osc.frequency.setValueAtTime(startFreq, this.ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(
+        endFreq,
+        this.ctx.currentTime + duration
+      );
+      
+      gain.gain.setValueAtTime(volume, this.ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(
+        0.001,
+        this.ctx.currentTime + duration
+      );
+      
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+      
+      osc.start();
+      osc.stop(this.ctx.currentTime + duration);
+    } catch (e) {}
+  },
+};
+
+/* ============================================================
+   نظام الركاب
+   ============================================================ */
+const passengers = [];
+let activeDestination = null;
+
+/* ============================================================
+   حالة اللعبة الرئيسية
+   ============================================================ */
+const gameState = {
+  running: false,
+  paused: false,
+  money: 0,
+  deliveries: 0,
+  ratingSum: 0,
+  timeLeft: CONFIG.gameDuration,
+  lastTime: 0,
+  spawnTimer: 0,
+  elapsedTime: 0,
+};
+
+// ربطها مع نظام الفيزياء
+setGameState(gameState);
+
+/* ============================================================
+   مواقع توليد الركاب (على الأرصفة)
+   ============================================================ */
+function getPassengerSpawnPoint() {
+  const candidates = [];
+  
+  ROADS_DATA.forEach(road => {
+    if (road.width < 14) return;
+    
+    // مواقع على الرصيف
+    const steps = Math.floor(road.length / 60);
+    for (let i = 0; i < steps; i++) {
+      const offset = -road.length / 2 + i * 60 + 30;
+      for (let side = -1; side <= 1; side += 2) {
+        const sideOffset = side * (road.width / 2 + CONFIG.sidewalkWidth / 2);
+        
+        const x = road.x + Math.sin(road.rotation) * offset + Math.cos(road.rotation) * sideOffset;
+        const z = road.z + Math.cos(road.rotation) * offset - Math.sin(road.rotation) * sideOffset;
+        
+        // نتجنب الترعة والسكة
+        if (Math.abs(z) < CONFIG.canalWidth / 2 + 5) continue;
+        if (Math.abs(x + 350) < 10) continue;
+        
+        // نتجنب التواجد قريب جداً من التوك توك
+        const distToTuk = Math.hypot(x - tukTuk.position.x, z - tukTuk.position.z);
+        if (distToTuk < 80 || distToTuk > 500) continue;
+        
+        candidates.push({ x, z });
+      }
+    }
+  });
+  
+  if (candidates.length === 0) return null;
+  return Utils.pick(candidates);
+}
+
+/* ============================================================
+   إنشاء راكب 3D
+   ============================================================ */
+function createPassengerMesh() {
+  const group = new THREE.Group();
+  
+  // ألوان عشوائية للراكب
+  const shirtColors = [
+    0xe74c3c, 0x3498db, 0x2ecc71, 0xf39c12,
+    0x9b59b6, 0xe67e22, 0x1abc9c, 0x34495e,
+  ];
+  const pantsColors = [0x2c3e50, 0x34495e, 0x1a1a1a, 0x5a3a2a];
+  const skinColors = [0xf5d5b0, 0xe0b890, 0xc89870, 0x8d5524];
+  
+  const shirtColor = Utils.pick(shirtColors);
+  const pantsColor = Utils.pick(pantsColors);
+  const skinColor = Utils.pick(skinColors);
+  
+  // الجسم (قميص)
+  const torsoMat = new THREE.MeshStandardMaterial({
+    color: shirtColor,
+    roughness: 0.85,
+  });
+  const torsoGeo = new THREE.BoxGeometry(0.5, 0.7, 0.3);
+  const torso = new THREE.Mesh(torsoGeo, torsoMat);
+  torso.position.y = 1.15;
+  torso.castShadow = true;
+  group.add(torso);
+  
+  // الرأس
+  const headMat = new THREE.MeshStandardMaterial({
+    color: skinColor,
+    roughness: 0.9,
+  });
+  const headGeo = new THREE.SphereGeometry(0.18, 12, 12);
+  const head = new THREE.Mesh(headGeo, headMat);
+  head.position.y = 1.68;
+  head.castShadow = true;
+  group.add(head);
+  
+  // البنطلون
+  const pantsMat = new THREE.MeshStandardMaterial({
+    color: pantsColor,
+    roughness: 0.9,
+  });
+  const legsGeo = new THREE.BoxGeometry(0.5, 0.8, 0.3);
+  const legs = new THREE.Mesh(legsGeo, pantsMat);
+  legs.position.y = 0.4;
+  legs.castShadow = true;
+  group.add(legs);
+  
+  // الذراعين
+  const armGeo = new THREE.BoxGeometry(0.14, 0.65, 0.14);
+  const armL = new THREE.Mesh(armGeo, torsoMat);
+  armL.position.set(-0.32, 1.15, 0);
+  armL.castShadow = true;
+  group.add(armL);
+  
+  const armR = new THREE.Mesh(armGeo, torsoMat);
+  armR.position.set(0.32, 1.15, 0);
+  armR.castShadow = true;
+  group.add(armR);
+  
+  // هالة تحت الراكب (للتنبيه)
+  const ringGeo = new THREE.RingGeometry(0.5, 0.7, 24);
+  const ringMat = new THREE.MeshBasicMaterial({
+    color: 0x00ff88,
+    transparent: true,
+    opacity: 0.6,
+    side: THREE.DoubleSide,
+  });
+  const ring = new THREE.Mesh(ringGeo, ringMat);
+  ring.rotation.x = -Math.PI / 2;
+  ring.position.y = 0.05;
+  group.add(ring);
+  group.userData.ring = ring;
+  
+  // سهم فوق الرأس
+  const arrowGeo = new THREE.ConeGeometry(0.2, 0.4, 4);
+  const arrowMat = new THREE.MeshBasicMaterial({
+    color: 0x00ff88,
+  });
+  const arrow = new THREE.Mesh(arrowGeo, arrowMat);
+  arrow.position.y = 2.3;
+  arrow.rotation.x = Math.PI; // عكس الاتجاه عشان يشاور تحت
+  group.add(arrow);
+  group.userData.arrow = arrow;
+  
+  return group;
+}
+
+/* ============================================================
+   توليد راكب جديد
+   ============================================================ */
+function spawnPassenger() {
+  if (passengers.length >= CONFIG.maxPassengers) return;
+  if (player.hasPassenger) return;
+  
+  const spawnPoint = getPassengerSpawnPoint();
+  if (!spawnPoint) return;
+  
+  // اختيار وجهة عشوائية (مختلفة عن مواقع الركاب الآخرين)
+  let destination;
+  let attempts = 0;
+  do {
+    destination = Utils.pick(DESTINATIONS_DATA);
+    attempts++;
+  } while (attempts < 10 && passengers.some(p => p.destination.name === destination.name));
+  
+  const mesh = createPassengerMesh();
+  mesh.position.set(spawnPoint.x, 0, spawnPoint.z);
+  // مواجهة عشوائية
+  mesh.rotation.y = Math.random() * Math.PI * 2;
+  scene.add(mesh);
+  
+  passengers.push({
+    mesh,
+    x: spawnPoint.x,
+    z: spawnPoint.z,
+    destination,
+    spawnTime: performance.now(),
+    bobPhase: Math.random() * Math.PI * 2,
+  });
+  
+  console.log(`👤 راكب جديد في (${spawnPoint.x.toFixed(0)}, ${spawnPoint.z.toFixed(0)}) → ${destination.name}`);
+  
+  updateMissionUI();
+}
+
+/* ============================================================
+   إنشاء علامة الوجهة (Destination Marker)
+   ============================================================ */
+function createDestinationMarker(destination) {
+  const group = new THREE.Group();
+  
+  // حلقة كبيرة
+  const ringGeo = new THREE.RingGeometry(2, 3, 32);
+  const ringMat = new THREE.MeshBasicMaterial({
+    color: destination.color,
+    transparent: true,
+    opacity: 0.7,
+    side: THREE.DoubleSide,
+  });
+  const ring = new THREE.Mesh(ringGeo, ringMat);
+  ring.rotation.x = -Math.PI / 2;
+  ring.position.y = 0.1;
+  group.add(ring);
+  
+  // دائرة داخلية
+  const innerGeo = new THREE.CircleGeometry(1.5, 24);
+  const innerMat = new THREE.MeshBasicMaterial({
+    color: destination.color,
+    transparent: true,
+    opacity: 0.3,
+    side: THREE.DoubleSide,
+  });
+  const inner = new THREE.Mesh(innerGeo, innerMat);
+  inner.rotation.x = -Math.PI / 2;
+  inner.position.y = 0.15;
+  group.add(inner);
+  
+  // عمود ضوء
+  const beamGeo = new THREE.CylinderGeometry(0.5, 1.5, 8, 16, 1, true);
+  const beamMat = new THREE.MeshBasicMaterial({
+    color: destination.color,
+    transparent: true,
+    opacity: 0.2,
+    side: THREE.DoubleSide,
+  });
+  const beam = new THREE.Mesh(beamGeo, beamMat);
+  beam.position.y = 4;
+  group.add(beam);
+  
+  // أيقونة فوق
+  const iconGeo = new THREE.SphereGeometry(0.6, 16, 16);
+  const iconMat = new THREE.MeshStandardMaterial({
+    color: destination.color,
+    emissive: destination.color,
+    emissiveIntensity: 0.8,
+  });
+  const icon = new THREE.Mesh(iconGeo, iconMat);
+  icon.position.y = 6;
+  group.add(icon);
+  group.userData.icon = icon;
+  group.userData.beam = beam;
+  group.userData.ring = ring;
+  
+  // إضاءة نقطية
+  const pointLight = new THREE.PointLight(destination.color, 1.5, 15);
+  pointLight.position.y = 3;
+  group.add(pointLight);
+  
+  group.position.set(destination.x, 0, destination.z);
+  group.userData.destination = destination;
+  group.userData.startTime = performance.now();
+  
+  return group;
+}
+
+/* ============================================================
+   أحداث الالتقاط والتوصيل
+   ============================================================ */
+function checkPassengerPickup() {
+  if (player.hasPassenger) return;
+  
+  const tukRadius = 1.8;
+  
+  for (let i = passengers.length - 1; i >= 0; i--) {
+    const p = passengers[i];
+    const dist = Math.hypot(
+      p.x - tukTuk.position.x,
+      p.z - tukTuk.position.z
+    );
+    
+    if (dist < tukRadius + 0.8) {
+      // التقطنا راكب!
+      const dest = p.destination;
+      
+      // إزالة الـ mesh
+      scene.remove(p.mesh);
+      p.mesh.traverse(child => {
+        if (child.geometry) child.geometry.dispose();
+        if (child.material) {
+          if (Array.isArray(child.material)) {
+            child.material.forEach(m => m.dispose());
+          } else {
+            child.material.dispose();
+          }
+        }
+      });
+      
+      passengers.splice(i, 1);
+      
+      // تعيين الراكب للتوك توك
+      player.hasPassenger = true;
+      player.currentPassenger = dest;
+      
+      // إنشاء علامة الوجهة
+      activeDestination = createDestinationMarker(dest);
+      scene.add(activeDestination);
+      
+      // أصوات وتأثيرات
+      AudioSystem.playPickup();
+      UI.showToast(`✅ راكب صعد! → ${dest.name}`, 2000);
+      
+      // صورة الراكب في التوك توك (كائن بسيط فوق المقعد)
+      const passengerRider = createPassengerMesh();
+      passengerRider.scale.set(0.85, 0.85, 0.85);
+      passengerRider.position.set(0, 0.4, -0.75);
+      passengerRider.userData.ring.visible = false;
+      passengerRider.userData.arrow.visible = false;
+      tukTuk.add(passengerRider);
+      tukTuk.userData.passengerRider = passengerRider;
+      
+      updateMissionUI();
+      break;
+    }
+  }
+}
+
+function checkDelivery() {
+  if (!player.hasPassenger || !activeDestination) return;
+  
+  const dest = activeDestination.userData.destination;
+  const dist = Math.hypot(
+    dest.x - tukTuk.position.x,
+    dest.z - tukTuk.position.z
+  );
+  
+  if (dist < 4) {
+    // تم التوصيل!
+    const isDelayed = gameState.timeLeft < 30;
+    const bonusTime = 15;
+    
+    // حساب المكافأة (بناءً على سرعة التوصيل)
+    const tripTime = (performance.now() - player.tripStartTime) / 1000;
+    let reward = 60;
+    let rating = 5;
+    
+    if (tripTime < 20) {
+      reward = 100;
+      rating = 5;
+    } else if (tripTime < 40) {
+      reward = 80;
+      rating = 4;
+    } else if (tripTime < 60) {
+      reward = 60;
+      rating = 3;
+    } else {
+      reward = 40;
+      rating = 2;
+    }
+    
+    // زيادة الوقت
+    gameState.timeLeft = Math.min(
+      gameState.timeLeft + bonusTime,
+      CONFIG.gameDuration
+    );
+    
+    gameState.money += reward;
+    gameState.deliveries++;
+    gameState.ratingSum += rating;
+    
+    // تأثيرات
+    AudioSystem.playDelivery();
+    UI.showToast(`🎉 تم التوصيل! +${reward} جنيه +${bonusTime} ثانية`, 2200);
+    
+    // إزالة علامة الوجهة
+    scene.remove(activeDestination);
+    activeDestination.traverse(child => {
+      if (child.geometry) child.geometry.dispose();
+      if (child.material) {
+        if (Array.isArray(child.material)) {
+          child.material.forEach(m => m.dispose());
+        } else {
+          child.material.dispose();
+        }
+      }
+    });
+    activeDestination = null;
+    
+    // إزالة الراكب من التوك توك
+    if (tukTuk.userData.passengerRider) {
+      tukTuk.remove(tukTuk.userData.passengerRider);
+      tukTuk.userData.passengerRider = null;
+    }
+    
+    player.hasPassenger = false;
+    player.currentPassenger = null;
+    
+    // توليد راكب جديد بعد فترة قصيرة
+    gameState.spawnTimer = 1.5;
+    
+    updateHUD();
+    updateMissionUI();
+  }
+}
+
+/* ============================================================
+   تحديث واجهة المستخدم
+   ============================================================ */
+function updateHUD() {
+  if (!UI.moneyValue) return;
+  
+  UI.moneyValue.textContent = gameState.money;
+  UI.deliveriesValue.textContent = gameState.deliveries;
+  UI.timeValue.textContent = Utils.formatTime(gameState.timeLeft);
+  
+  // تحذير الوقت
+  if (gameState.timeLeft < 20) {
+    UI.timeValue.classList.add('warning');
+  } else {
+    UI.timeValue.classList.remove('warning');
+  }
+  
+  // السرعة
+  const speedKmh = Math.abs(player.speed) * 3.6 * 3.5;
+  UI.speedValue.textContent = Math.round(speedKmh);
+}
+
+function updateMissionUI() {
+  if (!UI.missionPanel) return;
+  
+  if (player.hasPassenger && player.currentPassenger) {
+    UI.missionPanel.textContent = `🎯 اوصل الراكب إلى: ${player.currentPassenger.name}`;
+    UI.missionPanel.style.borderRightColor = '#00ff88';
+  } else if (passengers.length > 0) {
+    UI.missionPanel.textContent = `👤 ${passengers.length} راكب ينتظر — اقترب منهم لالتقاطهم`;
+    UI.missionPanel.style.borderRightColor = '#ffc800';
+  } else {
+    UI.missionPanel.textContent = '🔍 جاري البحث عن راكب...';
+    UI.missionPanel.style.borderRightColor = '#ffc800';
+  }
+}
+
+/* ============================================================
+   تحديث الركاب (الحركة الدورية)
+   ============================================================ */
+function updatePassengers(dt) {
+  const now = performance.now();
+  
+  passengers.forEach(p => {
+    // حركة صعود ونزول بسيطة (تنفس)
+    p.bobPhase += dt * 3;
+    const bob = Math.sin(p.bobPhase) * 0.05;
+    if (p.mesh) {
+      p.mesh.position.y = bob;
+    }
+    
+    // دوران الهالة
+    if (p.mesh && p.mesh.userData.ring) {
+      p.mesh.userData.ring.rotation.z += dt * 0.5;
+    }
+    
+    // السهم يطفو
+    if (p.mesh && p.mesh.userData.arrow) {
+      p.mesh.userData.arrow.position.y = 2.3 + Math.sin(now * 0.003 + p.bobPhase) * 0.15;
+      p.mesh.userData.arrow.rotation.y += dt * 2;
+    }
+  });
+  
+  // تحديث علامة الوجهة
+  if (activeDestination) {
+    const ud = activeDestination.userData;
+    const time = (now - ud.startTime) / 1000;
+    
+    // نبض
+    const pulse = 1 + Math.sin(time * 3) * 0.1;
+    ud.ring.scale.set(pulse, pulse, 1);
+    ud.beam.material.opacity = 0.15 + Math.sin(time * 2) * 0.08;
+    
+    // دوران الأيقونة
+    ud.icon.rotation.y += dt * 2;
+    ud.icon.position.y = 6 + Math.sin(time * 2) * 0.3;
+  }
+  
+  // تحديث الراكب الجالس في التوك توك
+  if (tukTuk.userData.passengerRider) {
+    const rider = tukTuk.userData.passengerRider;
+    rider.position.y = 0.4 + Math.sin(now * 0.005) * 0.02;
+  }
+}
+
+/* ============================================================
+   الحلقة الرئيسية للعبة
+   ============================================================ */
+function animate() {
+  requestAnimationFrame(animate);
+  
+  const now = performance.now();
+  let dt = (now - gameState.lastTime) / 1000;
+  gameState.lastTime = now;
+  
+  // حماية من الـ lag
+  dt = Math.min(dt, 0.05);
+  
+  // موجات الترعة (تشغل دائماً)
+  animateCanal(now);
+  
+  // لو اللعبة مش شغالة أو متوقفة
+  if (!gameState.running || gameState.paused) {
+    renderer.render(scene, camera);
+    return;
+  }
+  
+  gameState.elapsedTime += dt;
+  
+  // ============ الوقت ============
+  gameState.timeLeft -= dt;
+  if (gameState.timeLeft <= 0) {
+    gameState.timeLeft = 0;
+    endGame();
+    return;
+  }
+  
+  // ============ توليد الركاب ============
+  gameState.spawnTimer -= dt;
+  if (gameState.spawnTimer <= 0) {
+    if (passengers.length < CONFIG.maxPassengers && !player.hasPassenger) {
+      spawnPassenger();
+    }
+    gameState.spawnTimer = 2 + Math.random() * 3;
+  }
+  
+  // ============ فيزياء التوك توك ============
+  updateTukTukPhysics(dt);
+  
+  // ============ التحقق من الالتقاط والتوصيل ============
+  checkPassengerPickup();
+  checkDelivery();
+  
+  // ============ تحديث الكاميرا ============
+  updateCamera(dt);
+  
+  // ============ تحديث الركاب ============
+  updatePassengers(dt);
+  
+  // ============ الصوت ============
+  const isAccelerating = !!(keys['KeyW'] || keys['ArrowUp'] || mobileInput.accel);
+  AudioSystem.updateEngine(
+    Math.abs(player.speed),
+    player.maxSpeed,
+    isAccelerating
+  );
+  
+  // ============ تحديث الشمس ============
+  sunLight.position.set(
+    tukTuk.position.x + 180,
+    280,
+    tukTuk.position.z + 150
+  );
+  sunLight.target.position.copy(tukTuk.position);
+  sunLight.target.updateMatrixWorld();
+  
+  // ============ تحديث HUD ============
+  updateHUD();
+  
+  // ============ الرسم ============
+  renderer.render(scene, camera);
+}
+
+/* ============================================================
+   بدء اللعبة
+   ============================================================ */
+let isInitialized = false;
+
+async function startGame() {
+  console.log('🎬 محاولة بدء اللعبة...');
+  
+  // نهيئ الصوت (لازم بعد أول تفاعل من المستخدم)
+  AudioSystem.init();
+  AudioSystem.resume();
+  
+  // لو اللعبة اتبنت قبل كده، نعيد التشغيل بس
+  if (isInitialized) {
+    console.log('✅ إعادة تشغيل اللعبة');
+    resetGame();
+    gameState.running = true;
+    gameState.paused = false;
+    UI.startScreen.classList.add('hidden');
+    UI.endScreen.classList.add('hidden');
+    UI.hud.style.display = 'flex';
+    UI.missionPanel.style.display = 'block';
+    UI.pauseBtn.style.display = 'flex';
+    UI.crosshair.style.display = 'block';
+    
+    if (isMobile) {
+      UI.mobileControls.classList.add('visible');
+      UI.showHint('استخدم الأزرار للقيادة — اسحب بإصبعك للنظر', 6000);
+    } else {
+      UI.showHint('W/A/S/D للحركة — الماوس للنظر — Space فرملة', 6000);
+      renderer.domElement.requestPointerLock?.();
+    }
+    
+    // تشغيل صوت المحرك
+    if (player.engineOn) {
+      AudioSystem.setEngine(true);
+    }
+    return;
+  }
+  
+  // أول مرة - نبني المدينة
+  UI.startBtn.disabled = true;
+  UI.startBtn.textContent = '⏳ جاري التحميل...';
+  
+  try {
+    await buildCity((pct, text) => {
+      UI.updateLoading(pct, text);
+    });
+    
+    // إعداد الأزرار
+    setupMobileButtons();
+    setupPointerLock();
+    
+    // إعداد زر الإيقاف
+    UI.pauseBtn.addEventListener('click', togglePause);
+    document.addEventListener('keydown', (e) => {
+      if (e.code === 'Escape' || e.code === 'KeyP') {
+        if (gameState.running) togglePause();
+      }
+    });
+    
+    isInitialized = true;
+    
+    // شغل اللعبة
+    resetGame();
+    gameState.running = true;
+    gameState.lastTime = performance.now();
+    
+    // إخفاء شاشة البداية
+    UI.startScreen.classList.add('hidden');
+    UI.endScreen.classList.add('hidden');
+    
+    // إظهار الواجهة
+    UI.hud.style.display = 'flex';
+    UI.missionPanel.style.display = 'block';
+    UI.pauseBtn.style.display = 'flex';
+    UI.crosshair.style.display = 'block';
+    
+    // لو موبايل، نظهر الأزرار
+    if (isMobile) {
+      UI.mobileControls.classList.add('visible');
+      UI.showHint('استخدم الأزرار للقيادة — اسحب بإصبعك للنظر', 6000);
+    } else {
+      UI.showHint('W/A/S/D للحركة — الماوس للنظر — Space فرملة', 6000);
+    }
+    
+    // تشغيل صوت المحرك
+    if (player.engineOn) {
+      AudioSystem.setEngine(true);
+    }
+    
+    // نولّد راكبين في البداية
+    setTimeout(() => spawnPassenger(), 500);
+    setTimeout(() => spawnPassenger(), 1500);
+    
+    // أهلاً وسهلاً
+    UI.showToast('🛺 رحلة سعيدة!', 2000);
+    
+    // ابدأ الحلقة
+    if (!animate.started) {
+      animate.started = true;
+      gameState.lastTime = performance.now();
+      animate();
+    }
+    
+    console.log('✅ اللعبة بدأت!');
+    
+  } catch (error) {
+    console.error('❌ خطأ في تحميل اللعبة:', error);
+    UI.showToast('حدث خطأ أثناء التحميل، حاول مرة أخرى', 3000);
+    UI.startBtn.disabled = false;
+    UI.startBtn.textContent = '🚀 ابدأ الرحلة';
+  }
+}
+
+/* ============================================================
+   إعادة تشغيل اللعبة (بدون إعادة بناء المدينة)
+   ============================================================ */
+function resetGame() {
+  // إعادة تعيين حالة اللعبة
+  gameState.money = 0;
+  gameState.deliveries = 0;
+  gameState.ratingSum = 0;
+  gameState.timeLeft = CONFIG.gameDuration;
+  gameState.spawnTimer = 1;
+  gameState.elapsedTime = 0;
+  gameState.paused = false;
+  
+  // إعادة تعيين التوك توك
+  tukTuk.position.set(0, 0, 200);
+  tukTuk.rotation.set(0, 0, 0);
+  
+  // إعادة تعيين اللاعب
+  player.speed = 0;
+  player.steering = 0;
+  player.currentWheelAngle = 0;
+  player.headYaw = 0;
+  player.headPitch = 0;
+  player.hasPassenger = false;
+  player.currentPassenger = null;
+  player.engineOn = true;
+  player.handbrake = false;
+  
+  // إزالة الركاب
+  passengers.forEach(p => {
+    scene.remove(p.mesh);
+    p.mesh.traverse(child => {
+      if (child.geometry) child.geometry.dispose();
+      if (child.material) {
+        if (Array.isArray(child.material)) {
+          child.material.forEach(m => m.dispose());
+        } else {
+          child.material.dispose();
+        }
+      }
+    });
+  });
+  passengers.length = 0;
+  
+  // إزالة علامة الوجهة
+  if (activeDestination) {
+    scene.remove(activeDestination);
+    activeDestination.traverse(child => {
+      if (child.geometry) child.geometry.dispose();
+      if (child.material) {
+        if (Array.isArray(child.material)) {
+          child.material.forEach(m => m.dispose());
+        } else {
+          child.material.dispose();
+        }
+      }
+    });
+    activeDestination = null;
+  }
+  
+  // إزالة الراكب الجالس
+  if (tukTuk.userData.passengerRider) {
+    tukTuk.remove(tukTuk.userData.passengerRider);
+    tukTuk.userData.passengerRider = null;
+  }
+  
+  // إعادة تعيين الكاميرا
+  const offset = CAMERA_OFFSET.clone();
+  offset.applyAxisAngle(new THREE.Vector3(0, 1, 0), tukTuk.rotation.y);
+  camera.position.copy(tukTuk.position).add(offset);
+  camera.lookAt(tukTuk.position.x, tukTuk.position.y + 1.5, tukTuk.position.z + 10);
+  
+  updateHUD();
+  updateMissionUI();
+  
+  console.log('🔄 تم إعادة تعيين اللعبة');
+}
+
+/* ============================================================
+   إيقاف مؤقت
+   ============================================================ */
+function togglePause() {
+  if (!gameState.running) return;
+  
+  gameState.paused = !gameState.paused;
+  
+  if (gameState.paused) {
+    UI.pauseBtn.textContent = '▶️';
+    UI.showToast('⏸️ اللعبة متوقفة', 1500);
+    AudioSystem.setEngine(false);
+    if (document.pointerLockElement) {
+      document.exitPointerLock();
+    }
+  } else {
+    UI.pauseBtn.textContent = '⏸️';
+    UI.showToast('▶️ استمر!', 1000);
+    if (player.engineOn) AudioSystem.setEngine(true);
+    if (!isMobile) {
+      renderer.domElement.requestPointerLock?.();
+    }
+  }
+}
+
+/* ============================================================
+   إنهاء اللعبة
+   ============================================================ */
+function endGame() {
+  gameState.running = false;
+  AudioSystem.setEngine(false);
+  
+  if (document.pointerLockElement) {
+    document.exitPointerLock();
+  }
+  
+  // حساب التقييم
+  const avgRating = gameState.deliveries > 0
+    ? (gameState.ratingSum / gameState.deliveries).toFixed(1)
+    : '0';
+  
+  // عرض النتائج
+  UI.endTitle.textContent = gameState.deliveries > 0 ? '🎉 رحلة رائعة!' : '⏰ انتهى الوقت!';
+  UI.endMoney.textContent = `${gameState.money} جنيه`;
+  UI.endDeliveries.textContent = gameState.deliveries;
+  UI.endRating.textContent = `${avgRating} ⭐`;
+  
+  UI.endScreen.classList.remove('hidden');
+  UI.mobileControls.classList.remove('visible');
+  UI.pauseBtn.style.display = 'none';
+  
+  console.log('🏁 انتهت اللعبة', {
+    money: gameState.money,
+    deliveries: gameState.deliveries,
+    rating: avgRating,
+  });
+}
+
+/* ============================================================
+   ربط زر "ابدأ الرحلة"
+   ============================================================ */
+UI.startBtn.addEventListener('click', startGame);
+UI.startBtn.addEventListener('touchstart', (e) => {
+  e.preventDefault();
+  startGame();
+}, { passive: false });
+
+UI.restartBtn.addEventListener('click', () => {
+  UI.endScreen.classList.add('hidden');
+  startGame();
+});
+
+/* ============================================================
+   زر الكلاكس (اختياري - لمس مطول)
+   ============================================================ */
+let honkTimer = null;
+document.addEventListener('keydown', (e) => {
+  if (e.code === 'KeyH' && !honkTimer) {
+    AudioSystem.playHonk();
+    honkTimer = setTimeout(() => { honkTimer = null; }, 500);
+  }
+});
+
+/* ============================================================
+   تحذير الخروج
+   ============================================================ */
+window.addEventListener('beforeunload', (e) => {
+  if (gameState.running && gameState.deliveries > 0) {
+    e.preventDefault();
+    e.returnValue = '';
+  }
+});
+
+/* ============================================================
+   منع القائمة اليمنى على الموبايل
+   ============================================================ */
+document.addEventListener('contextmenu', (e) => e.preventDefault());
+
+/* ============================================================
+   جاهز!
+   ============================================================ */
+console.log('✅ الجزء 3 جاهز - الركاب والمهام والحلقة الرئيسية');
+console.log('🎮 اللعبة جاهزة! اضغط على "ابدأ الرحلة"');
