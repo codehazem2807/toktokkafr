@@ -226,38 +226,35 @@
 }
 </script>
 
-<script type="module">
 import * as THREE from 'three';
-import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
 
 // ==========================================
 // لعبة توك توك كفر الدوار - 3D FPS
-// المرحلة 1: الإعداد الأساسي
+// المرحلة 2: التوك توك + نظام القيادة
 // ==========================================
 
 // ---- إعدادات عامة ----
 const CONFIG = {
-  citySize: 2000,        // حجم المدينة بالمتر
-  canalWidth: 25,        // عرض ترعة المحمودية
-  roadWidth: 24,         // عرض الشوارع الرئيسية
-  sidewalkWidth: 3,      // عرض الرصيف
-  playerHeight: 1.5,     // ارتفاع نظر السائق
-  tukTukHeight: 1.2,     // ارتفاع التوك توك
-  moveSpeed: 12,         // سرعة الحركة (متر/ثانية)
-  lookSpeed: 0.002,      // سرعة النظر
+  citySize: 2000,
+  canalWidth: 25,
+  roadWidth: 24,
+  sidewalkWidth: 3,
+  driverHeight: 1.35,      // ارتفاع نظر السائق داخل الكابينة
+  moveSpeed: 12,
+  lookSpeed: 0.002,
 };
 
 // ---- المشهد ----
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x87CEEB); // لون سماء
-scene.fog = new THREE.Fog(0x87CEEB, 200, 800);
+scene.background = new THREE.Color(0x87CEEB);
+scene.fog = new THREE.Fog(0x87CEEB, 200, 900);
 
 // ---- الكاميرا ----
 const camera = new THREE.PerspectiveCamera(
-  75,                                    // مجال الرؤية
-  window.innerWidth / window.innerHeight, // نسبة العرض
-  0.1,                                   // أقرب مسافة
-  2000                                   // أبعد مسافة
+  75,
+  window.innerWidth / window.innerHeight,
+  0.05,     // قريب جداً عشان نشوف التفاصيل
+  2000
 );
 
 // ---- المصير ----
@@ -271,114 +268,522 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.0;
+renderer.toneMappingExposure = 1.1;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
 
 // ---- الإضاءة ----
-// ضوء الشمس
-const sunLight = new THREE.DirectionalLight(0xfff5e6, 2.5);
-sunLight.position.set(100, 200, 50);
+const sunLight = new THREE.DirectionalLight(0xfff5e6, 2.8);
+sunLight.position.set(150, 250, 100);
 sunLight.castShadow = true;
 sunLight.shadow.mapSize.width = 2048;
 sunLight.shadow.mapSize.height = 2048;
 sunLight.shadow.camera.near = 0.5;
-sunLight.shadow.camera.far = 1000;
-sunLight.shadow.camera.left = -300;
-sunLight.shadow.camera.right = 300;
-sunLight.shadow.camera.top = 300;
-sunLight.shadow.camera.bottom = -300;
+sunLight.shadow.camera.far = 800;
+sunLight.shadow.camera.left = -250;
+sunLight.shadow.camera.right = 250;
+sunLight.shadow.camera.top = 250;
+sunLight.shadow.camera.bottom = -250;
+sunLight.shadow.bias = -0.0005;
 scene.add(sunLight);
+scene.add(sunLight.target);
 
-// ضوء محيطي
-const ambientLight = new THREE.AmbientLight(0x404060, 1.5);
+const ambientLight = new THREE.AmbientLight(0x8899bb, 1.2);
 scene.add(ambientLight);
 
-// ضوء السماء
-const hemiLight = new THREE.HemisphereLight(0x87CEEB, 0x3a3a3a, 1.0);
+const hemiLight = new THREE.HemisphereLight(0x87CEEB, 0x3a3a3a, 1.1);
 scene.add(hemiLight);
 
-// ---- التحكم ----
-const controls = new PointerLockControls(camera, renderer.domElement);
+// ==========================================
+// 🛺 إنشاء التوك توك ثلاثي الأبعاد
+// ==========================================
+function createTukTuk() {
+  const tukTuk = new THREE.Group();
 
-// إضافة الكاميرا للمشهد
-scene.add(controls.getObject());
+  // --- المواد ---
+  const yellowMat = new THREE.MeshStandardMaterial({
+    color: 0xffc800,
+    roughness: 0.4,
+    metalness: 0.3
+  });
 
-// ---- حالة اللاعب ----
+  const blackMat = new THREE.MeshStandardMaterial({
+    color: 0x111111,
+    roughness: 0.6,
+    metalness: 0.2
+  });
+
+  const glassMat = new THREE.MeshPhysicalMaterial({
+    color: 0xaaddff,
+    roughness: 0.05,
+    metalness: 0.1,
+    transmission: 0.9,
+    transparent: true,
+    opacity: 0.5,
+    thickness: 0.1
+  });
+
+  const chromeMat = new THREE.MeshStandardMaterial({
+    color: 0xcccccc,
+    roughness: 0.15,
+    metalness: 0.95
+  });
+
+  const redMat = new THREE.MeshStandardMaterial({
+    color: 0xcc0000,
+    roughness: 0.5,
+    emissive: 0x660000,
+    emissiveIntensity: 0.3
+  });
+
+  const tireMat = new THREE.MeshStandardMaterial({
+    color: 0x1a1a1a,
+    roughness: 0.9
+  });
+
+  const rimMat = new THREE.MeshStandardMaterial({
+    color: 0xdddddd,
+    roughness: 0.3,
+    metalness: 0.8
+  });
+
+  // --- الهيكل السفلي (Chassis) ---
+  const chassisGeo = new THREE.BoxGeometry(1.4, 0.15, 2.6);
+  const chassis = new THREE.Mesh(chassisGeo, blackMat);
+  chassis.position.y = 0.45;
+  chassis.castShadow = true;
+  chassis.receiveShadow = true;
+  tukTuk.add(chassis);
+
+  // --- الجزء الأمامي (المقصورة الأمامية) ---
+  const frontGeo = new THREE.BoxGeometry(1.35, 0.9, 1.2);
+  const frontBox = new THREE.Mesh(frontGeo, yellowMat);
+  frontBox.position.set(0, 1.0, 0.7);
+  frontBox.castShadow = true;
+  frontBox.receiveShadow = true;
+  tukTuk.add(frontBox);
+
+  // --- الكابينة الخلفية (للركاب) ---
+  const cabinGeo = new THREE.BoxGeometry(1.4, 1.5, 1.5);
+  const cabin = new THREE.Mesh(cabinGeo, yellowMat);
+  cabin.position.set(0, 1.3, -0.65);
+  cabin.castShadow = true;
+  cabin.receiveShadow = true;
+  tukTuk.add(cabin);
+
+  // --- السقف الأسود ---
+  const roofGeo = new THREE.BoxGeometry(1.5, 0.15, 2.8);
+  const roof = new THREE.Mesh(roofGeo, blackMat);
+  roof.position.set(0, 2.15, 0);
+  roof.castShadow = true;
+  tukTuk.add(roof);
+
+  // --- الأعمدة الرأسية اللي شايلة السقف (4 أعمدة) ---
+  const pillarGeo = new THREE.CylinderGeometry(0.05, 0.05, 1.8);
+  const pillarPositions = [
+    [-0.7, 1.25, -1.4],
+    [0.7, 1.25, -1.4],
+    [-0.7, 1.25, 0.05],
+    [0.7, 1.25, 0.05],
+    [-0.7, 1.25, 1.35],
+    [0.7, 1.25, 1.35]
+  ];
+  pillarPositions.forEach(pos => {
+    const pillar = new THREE.Mesh(pillarGeo, blackMat);
+    pillar.position.set(...pos);
+    pillar.castShadow = true;
+    tukTuk.add(pillar);
+  });
+
+  // --- الزجاج الأمامي ---
+  const windshieldGeo = new THREE.BoxGeometry(1.3, 0.85, 0.05);
+  const windshield = new THREE.Mesh(windshieldGeo, glassMat);
+  windshield.position.set(0, 1.85, 1.35);
+  windshield.rotation.x = -0.15;
+  tukTuk.add(windshield);
+
+  // --- الزجاج الجانبي (يمين وشمال المقصورة الأمامية) ---
+  const sideGlassGeo = new THREE.BoxGeometry(0.05, 0.75, 1.1);
+  const sideGlassL = new THREE.Mesh(sideGlassGeo, glassMat);
+  sideGlassL.position.set(-0.69, 1.85, 0.7);
+  tukTuk.add(sideGlassL);
+
+  const sideGlassR = new THREE.Mesh(sideGlassGeo, glassMat);
+  sideGlassR.position.set(0.69, 1.85, 0.7);
+  tukTuk.add(sideGlassR);
+
+  // --- شبكة أمامية ---
+  const grillGeo = new THREE.BoxGeometry(1.0, 0.3, 0.05);
+  const grill = new THREE.Mesh(grillGeo, chromeMat);
+  grill.position.set(0, 1.0, 1.31);
+  tukTuk.add(grill);
+
+  // --- المصابيح الأمامية ---
+  const headlightGeo = new THREE.CylinderGeometry(0.12, 0.12, 0.08, 16);
+  const headlightMat = new THREE.MeshStandardMaterial({
+    color: 0xffffcc,
+    emissive: 0xffffaa,
+    emissiveIntensity: 1.5
+  });
+
+  const hl1 = new THREE.Mesh(headlightGeo, headlightMat);
+  hl1.rotation.x = Math.PI / 2;
+  hl1.position.set(-0.5, 1.25, 1.32);
+  tukTuk.add(hl1);
+
+  const hl2 = new THREE.Mesh(headlightGeo, headlightMat);
+  hl2.rotation.x = Math.PI / 2;
+  hl2.position.set(0.5, 1.25, 1.32);
+  tukTuk.add(hl2);
+
+  // --- إضاءة فعلية من المصابيح (Spot Light) ---
+  const headlight = new THREE.SpotLight(0xffffee, 3, 30, Math.PI / 5, 0.5, 1.5);
+  headlight.position.set(0, 1.25, 1.3);
+  headlight.target.position.set(0, 0, 10);
+  tukTuk.add(headlight);
+  tukTuk.add(headlight.target);
+
+  // --- الفوانيس الخلفية ---
+  const taillightGeo = new THREE.BoxGeometry(0.15, 0.2, 0.05);
+  const tl1 = new THREE.Mesh(taillightGeo, redMat);
+  tl1.position.set(-0.55, 1.0, -1.41);
+  tukTuk.add(tl1);
+
+  const tl2 = new THREE.Mesh(taillightGeo, redMat);
+  tl2.position.set(0.55, 1.0, -1.41);
+  tukTuk.add(tl2);
+
+  // --- العجلات (3 عجلات: أمامية واحدة + خلفيتان) ---
+  const wheels = [];
+
+  function createWheel(x, z, isFront) {
+    const wheelGroup = new THREE.Group();
+
+    // الإطار
+    const tireGeo = new THREE.TorusGeometry(0.28, 0.12, 12, 24);
+    const tire = new THREE.Mesh(tireGeo, tireMat);
+    tire.rotation.y = Math.PI / 2;
+    tire.castShadow = true;
+    wheelGroup.add(tire);
+
+    // الجنط
+    const rimGeo = new THREE.CylinderGeometry(0.18, 0.18, 0.15, 8);
+    const rim = new THREE.Mesh(rimGeo, rimMat);
+    rim.rotation.z = Math.PI / 2;
+    wheelGroup.add(rim);
+
+    // البراغي
+    for (let i = 0; i < 4; i++) {
+      const boltGeo = new THREE.SphereGeometry(0.03, 6, 6);
+      const bolt = new THREE.Mesh(boltGeo, blackMat);
+      const angle = (i / 4) * Math.PI * 2;
+      bolt.position.set(0, Math.cos(angle) * 0.1, Math.sin(angle) * 0.1);
+      wheelGroup.add(bolt);
+    }
+
+    wheelGroup.position.set(x, 0.28, z);
+    wheelGroup.userData.isFront = isFront;
+    tukTuk.add(wheelGroup);
+    wheels.push(wheelGroup);
+
+    return wheelGroup;
+  }
+
+  // العجلة الأمامية (في المنتصف)
+  const frontWheel = createWheel(0, 1.3, true);
+  
+  // العجلتان الخلفيتان
+  const rearLeftWheel = createWheel(-0.7, -0.9, false);
+  const rearRightWheel = createWheel(0.7, -0.9, false);
+
+  // --- المقود ---
+  const steeringWheelGroup = new THREE.Group();
+  
+  // حلقة المقود
+  const steeringRing = new THREE.Mesh(
+    new THREE.TorusGeometry(0.15, 0.02, 8, 24),
+    blackMat
+  );
+  steeringWheelGroup.add(steeringRing);
+
+  // أذرع المقود (3 أذرع)
+  for (let i = 0; i < 3; i++) {
+    const spokeGeo = new THREE.BoxGeometry(0.02, 0.14, 0.015);
+    const spoke = new THREE.Mesh(spokeGeo, blackMat);
+    spoke.rotation.z = (i / 3) * Math.PI * 2;
+    steeringWheelGroup.add(spoke);
+  }
+
+  // العمود
+  const columnGeo = new THREE.CylinderGeometry(0.025, 0.025, 0.4);
+  const column = new THREE.Mesh(columnGeo, blackMat);
+  column.rotation.x = -0.5;
+  column.position.set(0, -0.15, 0.15);
+  steeringWheelGroup.add(column);
+
+  // موضع المقود
+  steeringWheelGroup.position.set(0, 1.55, 0.85);
+  steeringWheelGroup.rotation.x = -0.4;
+  tukTuk.add(steeringWheelGroup);
+
+  // --- لوحة القيادة ---
+  const dashGeo = new THREE.BoxGeometry(1.3, 0.25, 0.4);
+  const dashMat = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.8 });
+  const dashboard = new THREE.Mesh(dashGeo, dashMat);
+  dashboard.position.set(0, 1.35, 1.05);
+  tukTuk.add(dashboard);
+
+  // --- عدادات على لوحة القيادة ---
+  const gaugeGeo = new THREE.CircleGeometry(0.06, 16);
+  const gaugeMat = new THREE.MeshBasicMaterial({ color: 0x111111 });
+  for (let i = 0; i < 3; i++) {
+    const gauge = new THREE.Mesh(gaugeGeo, gaugeMat);
+    gauge.position.set(-0.3 + i * 0.3, 1.42, 1.26);
+    tukTuk.add(gauge);
+  }
+
+  // --- المرايا الجانبية ---
+  const mirrorGeo = new THREE.BoxGeometry(0.08, 0.12, 0.02);
+  const mirrorMat = new THREE.MeshStandardMaterial({ 
+    color: 0x666666, 
+    metalness: 0.9, 
+    roughness: 0.1 
+  });
+  
+  const mirrorL = new THREE.Mesh(mirrorGeo, mirrorMat);
+  mirrorL.position.set(-0.75, 1.9, 1.2);
+  tukTuk.add(mirrorL);
+  
+  const mirrorR = new THREE.Mesh(mirrorGeo, mirrorMat);
+  mirrorR.position.set(0.75, 1.9, 1.2);
+  tukTuk.add(mirrorR);
+
+  // --- لوحة التوك توك (رقم اللوحة) ---
+  const plateGeo = new THREE.BoxGeometry(0.5, 0.15, 0.02);
+  const plateMat = new THREE.MeshStandardMaterial({ color: 0xffffff });
+  const plate = new THREE.Mesh(plateGeo, plateMat);
+  plate.position.set(0, 0.7, -1.41);
+  tukTuk.add(plate);
+
+  // --- الزخارف والكتابة ---
+  // خط أسود على الجانب
+  const stripeGeo = new THREE.BoxGeometry(0.02, 0.15, 2.5);
+  const stripeMat = new THREE.MeshStandardMaterial({ color: 0x000000 });
+  const stripeL = new THREE.Mesh(stripeGeo, stripeMat);
+  stripeL.position.set(-0.71, 1.4, 0);
+  tukTuk.add(stripeL);
+  
+  const stripeR = new THREE.Mesh(stripeGeo, stripeMat);
+  stripeR.position.set(0.71, 1.4, 0);
+  tukTuk.add(stripeR);
+
+  // --- تفاصيل داخلية ---
+  // المقعد الأمامي
+  const seatGeo = new THREE.BoxGeometry(1.2, 0.15, 0.5);
+  const seatMat = new THREE.MeshStandardMaterial({ color: 0x333333, roughness: 0.9 });
+  const seat = new THREE.Mesh(seatGeo, seatMat);
+  seat.position.set(0, 0.85, 0.2);
+  tukTuk.add(seat);
+
+  // مسند الظهر
+  const backGeo = new THREE.BoxGeometry(1.2, 0.6, 0.1);
+  const back = new THREE.Mesh(backGeo, seatMat);
+  back.position.set(0, 1.2, -0.1);
+  tukTuk.add(back);
+
+  // المقعد الخلفي (للركاب)
+  const rearSeatGeo = new THREE.BoxGeometry(1.3, 0.15, 0.6);
+  const rearSeat = new THREE.Mesh(rearSeatGeo, seatMat);
+  rearSeat.position.set(0, 0.85, -0.9);
+  tukTuk.add(rearSeat);
+
+  const rearBackGeo = new THREE.BoxGeometry(1.3, 0.6, 0.1);
+  const rearBack = new THREE.Mesh(rearBackGeo, seatMat);
+  rearBack.position.set(0, 1.2, -1.25);
+  tukTuk.add(rearBack);
+
+  // --- تخزين المراجع المهمة ---
+  tukTuk.userData = {
+    wheels: wheels,
+    frontWheel: frontWheel,
+    steeringWheel: steeringWheelGroup,
+    headlight: headlight
+  };
+
+  return tukTuk;
+}
+
+// ---- إنشاء التوك توك وإضافته للمشهد ----
+const tukTuk = createTukTuk();
+tukTuk.position.set(800, 0, 600);
+scene.add(tukTuk);
+
+// ==========================================
+// 🎮 حالة اللاعب والسائق
+// ==========================================
 const player = {
-  position: new THREE.Vector3(800, CONFIG.playerHeight, 600),
-  velocity: new THREE.Vector3(),
-  direction: new THREE.Vector3(),
-  speed: 0,
-  maxSpeed: CONFIG.moveSpeed,
-  acceleration: 25,
-  friction: 8,
-  angle: 0,
-  targetAngle: 0,
-  isLocked: false
+  // حالة التوك توك (فيزياء)
+  speed: 0,              // السرعة الحالية (م/ث)
+  maxSpeed: 15,          // السرعة القصوى للأمام
+  maxReverseSpeed: 4,    // السرعة القصوى للخلف
+  acceleration: 6,        // قوة التسارع
+  braking: 12,            // قوة الفرملة
+  friction: 0.4,          // الاحتكاك الطبيعي
+  steering: 0,            // زاوية المقود (-1 إلى 1)
+  steeringSpeed: 1.8,     // سرعة تحريك المقود
+  maxWheelAngle: 0.5,     // أقصى زاوية للعجلة
+  currentWheelAngle: 0,   // زاوية العجلة الحالية
+  
+  // حالة الكاميرا (رؤوس)
+  headYaw: 0,             // دوران الرأس يمين/شمال
+  headPitch: 0,           // ميل الرأس فوق/تحت
+  
+  isLocked: false,
+  engineOn: true,
+  handbrake: false,
 };
 
-// ---- المدخلات ----
+// ---- إعدادات الكاميرا داخل الكابينة ----
+const CAMERA_OFFSET = new THREE.Vector3(0, 1.35, 0.2); // موقع الكاميرا بالنسبة للتوك توك
+
+// ---- إعدادات القيادة ----
 const keys = {};
 
 document.addEventListener('keydown', (e) => {
   keys[e.code] = true;
+  
+  // منع تصفح الصفحة
+  if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) {
+    e.preventDefault();
+  }
+  
+  // فرملة اليد
+  if (e.code === 'Space') {
+    player.handbrake = true;
+  }
+  
+  // تشغيل/إطفاء المحرك
+  if (e.code === 'KeyE') {
+    player.engineOn = !player.engineOn;
+    playEngineSound(player.engineOn);
+  }
 });
 
 document.addEventListener('keyup', (e) => {
   keys[e.code] = false;
+  
+  if (e.code === 'Space') {
+    player.handbrake = false;
+  }
 });
 
-// قفل الماوس
+// ---- التحكم بالماوس (دوران الرأس داخل الكابينة) ----
+let isPointerLocked = false;
+
 document.getElementById('startBtn').addEventListener('click', () => {
-  controls.lock();
+  renderer.domElement.requestPointerLock();
 });
 
-controls.addEventListener('lock', () => {
-  player.isLocked = true;
-  document.getElementById('startScreen').classList.add('hidden');
-  document.getElementById('hud').classList.remove('hidden');
-  document.getElementById('missionText').classList.remove('hidden');
-  document.getElementById('crosshair').classList.remove('hidden');
-  document.getElementById('instructions').classList.remove('hidden');
+document.addEventListener('pointerlockchange', () => {
+  isPointerLocked = document.pointerLockElement === renderer.domElement;
+  player.isLocked = isPointerLocked;
+  
+  if (isPointerLocked) {
+    document.getElementById('startScreen').classList.add('hidden');
+    document.getElementById('hud').classList.remove('hidden');
+    document.getElementById('missionText').classList.remove('hidden');
+    document.getElementById('crosshair').classList.remove('hidden');
+    document.getElementById('instructions').classList.remove('hidden');
+  }
 });
 
-controls.addEventListener('unlock', () => {
-  player.isLocked = false;
+document.addEventListener('mousemove', (e) => {
+  if (!isPointerLocked) return;
+  
+  // دوران الرأس (بحدود واقعية)
+  player.headYaw -= e.movementX * 0.002;
+  player.headPitch -= e.movementY * 0.002;
+  
+  // تقييد دوران الرأس (زي السواق الحقيقي)
+  player.headYaw = Math.max(-Math.PI * 0.7, Math.min(Math.PI * 0.7, player.headYaw));
+  player.headPitch = Math.max(-0.5, Math.min(0.4, player.headPitch));
 });
 
-// ---- إنشاء الأرضية الأساسية ----
+// ==========================================
+// 🎵 نظام الصوت
+// ==========================================
+let audioContext = null;
+let engineOscillator = null;
+let engineGain = null;
+
+function initAudio() {
+  if (audioContext) return;
+  audioContext = new (window.AudioContext || window.webkitAudioContext)();
+}
+
+function playEngineSound(on) {
+  initAudio();
+  if (!audioContext) return;
+  
+  if (on && !engineOscillator) {
+    // صوت المحرك الأساسي (موجة سن المنشار)
+    engineOscillator = audioContext.createOscillator();
+    engineOscillator.type = 'sawtooth';
+    engineOscillator.frequency.value = 60;
+    
+    // فلتر لتخفيف الصوت
+    const filter = audioContext.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.value = 400;
+    
+    // التحكم في مستوى الصوت
+    engineGain = audioContext.createGain();
+    engineGain.gain.value = 0.08;
+    
+    engineOscillator.connect(filter);
+    filter.connect(engineGain);
+    engineGain.connect(audioContext.destination);
+    
+    engineOscillator.start();
+  } else if (!on && engineOscillator) {
+    engineOscillator.stop();
+    engineOscillator = null;
+    engineGain = null;
+  }
+}
+
+function updateEngineSound() {
+  if (!engineOscillator || !engineGain) return;
+  
+  // ربط الصوت بالسرعة
+  const speedRatio = Math.abs(player.speed) / player.maxSpeed;
+  engineOscillator.frequency.value = 60 + speedRatio * 120;
+  engineGain.gain.value = 0.05 + speedRatio * 0.1;
+}
+
+// ==========================================
+// 🏗️ بناء المدينة (نفس المرحلة 1)
+// ==========================================
 function createGround() {
-  // الأرضية الخضراء (الزراعة المحيطة)
   const groundGeo = new THREE.PlaneGeometry(5000, 5000);
   const groundMat = new THREE.MeshStandardMaterial({
     color: 0x4a7c3f,
-    roughness: 1,
-    metalness: 0
+    roughness: 1
   });
   const ground = new THREE.Mesh(groundGeo, groundMat);
   ground.rotation.x = -Math.PI / 2;
   ground.receiveShadow = true;
   scene.add(ground);
-
-  // شبكة إرشادية (للتطوير)
-  const gridHelper = new THREE.GridHelper(2000, 100, 0x000000, 0x222222);
-  gridHelper.position.y = 0.01;
-  gridHelper.material.opacity = 0.2;
-  gridHelper.material.transparent = true;
-  scene.add(gridHelper);
-
   return ground;
 }
 
-// ---- إنشاء ترعة المحمودية ----
 function createCanal() {
-  const canalGroup = new THREE.Group();
-
-  // مياه الترعة
-  const waterGeo = new THREE.PlaneGeometry(CONFIG.citySize, CONFIG.canalWidth);
+  const group = new THREE.Group();
+  
+  const waterGeo = new THREE.PlaneGeometry(CONFIG.citySize, CONFIG.canalWidth, 50, 10);
   const waterMat = new THREE.MeshStandardMaterial({
     color: 0x1a4a6a,
     roughness: 0.1,
-    metalness: 0.8,
+    metalness: 0.7,
     transparent: true,
     opacity: 0.85
   });
@@ -386,71 +791,51 @@ function createCanal() {
   water.rotation.x = -Math.PI / 2;
   water.position.y = -0.5;
   water.receiveShadow = true;
-  canalGroup.add(water);
+  group.add(water);
+  group.userData.water = water;
 
-  // ضفاف الترعة
-  const bankMat = new THREE.MeshStandardMaterial({
-    color: 0x8b7355,
-    roughness: 1
-  });
-
-  // الضفة الشمالية
-  const northBankGeo = new THREE.BoxGeometry(CONFIG.citySize, 2, 4);
-  const northBank = new THREE.Mesh(northBankGeo, bankMat);
+  const bankMat = new THREE.MeshStandardMaterial({ color: 0x8b7355, roughness: 1 });
+  const bankGeo = new THREE.BoxGeometry(CONFIG.citySize, 2, 4);
+  
+  const northBank = new THREE.Mesh(bankGeo, bankMat);
   northBank.position.set(0, 1, -(CONFIG.canalWidth / 2 + 2));
   northBank.castShadow = true;
   northBank.receiveShadow = true;
-  canalGroup.add(northBank);
+  group.add(northBank);
 
-  // الضفة الجنوبية
-  const southBank = new THREE.Mesh(northBankGeo, bankMat);
+  const southBank = new THREE.Mesh(bankGeo, bankMat);
   southBank.position.set(0, 1, (CONFIG.canalWidth / 2 + 2));
   southBank.castShadow = true;
   southBank.receiveShadow = true;
-  canalGroup.add(southBank);
+  group.add(southBank);
 
-  // جسر أحمد عرابي (يمر فوق الترعة)
+  // جسر أحمد عرابي
   const bridgeGeo = new THREE.BoxGeometry(30, 3, CONFIG.canalWidth + 20);
-  const bridgeMat = new THREE.MeshStandardMaterial({
-    color: 0x555555,
-    roughness: 0.9
-  });
+  const bridgeMat = new THREE.MeshStandardMaterial({ color: 0x555555, roughness: 0.9 });
   const bridge = new THREE.Mesh(bridgeGeo, bridgeMat);
   bridge.position.set(800, 2, 0);
   bridge.castShadow = true;
   bridge.receiveShadow = true;
-  canalGroup.add(bridge);
+  group.add(bridge);
 
-  // درابزين الجسر
   const railMat = new THREE.MeshStandardMaterial({ color: 0xcccccc, metalness: 0.5 });
   for (let side = -1; side <= 1; side += 2) {
     const railGeo = new THREE.BoxGeometry(2, 1.2, CONFIG.canalWidth + 20);
     const rail = new THREE.Mesh(railGeo, railMat);
     rail.position.set(800 + (side * 14), 3.6, 0);
     rail.castShadow = true;
-    canalGroup.add(rail);
+    group.add(rail);
   }
 
-  scene.add(canalGroup);
-  return canalGroup;
+  scene.add(group);
+  return group;
 }
 
-// ---- إنشاء الشوارع الرئيسية ----
 function createRoads() {
   const roadGroup = new THREE.Group();
+  const roadMat = new THREE.MeshStandardMaterial({ color: 0x3a3a3a, roughness: 0.95 });
+  const sidewalkMat = new THREE.MeshStandardMaterial({ color: 0x999999, roughness: 1 });
 
-  const roadMat = new THREE.MeshStandardMaterial({
-    color: 0x3a3a3a,
-    roughness: 0.95,
-    metalness: 0.05
-  });
-
-  const sidewalkMat = new THREE.MeshStandardMaterial({
-    color: 0x999999,
-    roughness: 1
-  });
-
-  // دالة مساعدة لإنشاء شارع
   function createRoad(x, z, width, length, rotation = 0) {
     const roadGeo = new THREE.BoxGeometry(width, 0.2, length);
     const road = new THREE.Mesh(roadGeo, roadMat);
@@ -458,12 +843,9 @@ function createRoads() {
     road.rotation.y = rotation;
     road.receiveShadow = true;
     roadGroup.add(road);
-
-    return road;
   }
 
-  // دالة مساعدة لإنشاء رصيف
-  function createSidewalk(x, z, width, length, rotation = 0) {
+  function createSidewalk(x, z, length, rotation = 0) {
     const sideGeo = new THREE.BoxGeometry(CONFIG.sidewalkWidth, 0.4, length);
     const sidewalk = new THREE.Mesh(sideGeo, sidewalkMat);
     sidewalk.position.set(x, 0.3, z);
@@ -471,94 +853,62 @@ function createRoads() {
     sidewalk.receiveShadow = true;
     sidewalk.castShadow = true;
     roadGroup.add(sidewalk);
-    return sidewalk;
   }
 
-  // === الشوارع الرئيسية ===
-
-  // 1. شارع أحمد عرابي (الأهم - يمتد شرق-غرب على طول الترعة)
-  // بطول 5155 متر وعرض 24 متر
+  // شارع أحمد عرابي
   createRoad(0, -15, CONFIG.roadWidth, CONFIG.citySize);
-  createSidewalk(-CONFIG.roadWidth/2 - CONFIG.sidewalkWidth/2, -15, CONFIG.sidewalkWidth, CONFIG.citySize);
-  createSidewalk(CONFIG.roadWidth/2 + CONFIG.sidewalkWidth/2, -15, CONFIG.sidewalkWidth, CONFIG.citySize);
+  createSidewalk(-CONFIG.roadWidth/2 - CONFIG.sidewalkWidth/2, -15, CONFIG.citySize);
+  createSidewalk(CONFIG.roadWidth/2 + CONFIG.sidewalkWidth/2, -15, CONFIG.citySize);
 
-  // 2. شارع بورسعيد (جنوب الترعة)
+  // شارع بورسعيد
   createRoad(0, 25, CONFIG.roadWidth * 0.8, CONFIG.citySize);
-  createSidewalk(-CONFIG.roadWidth*0.4 - CONFIG.sidewalkWidth/2, 25, CONFIG.sidewalkWidth, CONFIG.citySize);
-  createSidewalk(CONFIG.roadWidth*0.4 + CONFIG.sidewalkWidth/2, 25, CONFIG.sidewalkWidth, CONFIG.citySize);
+  createSidewalk(-CONFIG.roadWidth*0.4 - CONFIG.sidewalkWidth/2, 25, CONFIG.citySize);
+  createSidewalk(CONFIG.roadWidth*0.4 + CONFIG.sidewalkWidth/2, 25, CONFIG.citySize);
 
-  // 3. شارع الجيش (المدخل الجنوبي - شمال-جنوب)
+  // شارع الجيش
   createRoad(300, 0, CONFIG.roadWidth * 0.8, 800, Math.PI / 2);
-  createSidewalk(300 - CONFIG.roadWidth*0.4 - CONFIG.sidewalkWidth/2, 0, CONFIG.sidewalkWidth, 800, Math.PI / 2);
-  createSidewalk(300 + CONFIG.roadWidth*0.4 + CONFIG.sidewalkWidth/2, 0, CONFIG.sidewalkWidth, 800, Math.PI / 2);
-
-  // 4. شارع الجمهورية
+  
+  // شارع الجمهورية
   createRoad(-400, 0, CONFIG.roadWidth * 0.7, 700, Math.PI / 2);
-
-  // 5. شارع الحدائق (جاري توسعته)
+  
+  // شارع الحدائق
   createRoad(100, 400, CONFIG.roadWidth * 0.6, 600, Math.PI / 2);
-
-  // 6. شارع سيدي عبد القادر (المدخل الغربي)
+  
+  // شارع سيدي عبد القادر
   createRoad(-700, 100, CONFIG.roadWidth * 0.7, 500, Math.PI / 2);
-
-  // 7. شارع جلال الدسوقي
+  
+  // شارع جلال الدسوقي
   createRoad(-150, 500, CONFIG.roadWidth * 0.6, 700, Math.PI / 2);
-
-  // 8. شارع المحور
+  
+  // شارع المحور
   createRoad(600, 400, CONFIG.roadWidth * 0.6, 500, Math.PI / 2);
 
-  // === الشوارع الثانوية ===
-
-  // شوارع عرضية
+  // شوارع ثانوية
   createRoad(-800, -400, CONFIG.roadWidth * 0.5, 400);
   createRoad(-200, -500, CONFIG.roadWidth * 0.5, 300);
   createRoad(500, -300, CONFIG.roadWidth * 0.5, 400);
   createRoad(900, -500, CONFIG.roadWidth * 0.5, 300);
-
-  // شوارع طولية
   createRoad(-600, 600, CONFIG.roadWidth * 0.5, 400, Math.PI / 2);
   createRoad(200, 700, CONFIG.roadWidth * 0.5, 300, Math.PI / 2);
   createRoad(700, 600, CONFIG.roadWidth * 0.5, 400, Math.PI / 2);
 
-  // خطوط الشوارع (علامات الطريق)
-  function addRoadMarkings() {
-    const markMat = new THREE.MeshBasicMaterial({ color: 0xffcc00 });
-
-    // خطوط شارع أحمد عرابي
-    for (let z = -900; z < 900; z += 20) {
-      const markGeo = new THREE.BoxGeometry(0.3, 0.1, 8);
-      const mark = new THREE.Mesh(markGeo, markMat);
-      mark.position.set(0, 0.25, z);
-      roadGroup.add(mark);
-    }
-
-    // خطوط شارع بورسعيد
-    for (let z = -900; z < 900; z += 20) {
-      const markGeo = new THREE.BoxGeometry(0.3, 0.1, 6);
-      const mark = new THREE.Mesh(markGeo, markMat);
-      mark.position.set(0, 0.25, z + 25);
-      roadGroup.add(mark);
-    }
+  // علامات الطريق
+  const markMat = new THREE.MeshBasicMaterial({ color: 0xffcc00 });
+  for (let z = -900; z < 900; z += 20) {
+    const markGeo = new THREE.BoxGeometry(0.3, 0.1, 8);
+    const mark = new THREE.Mesh(markGeo, markMat);
+    mark.position.set(0, 0.25, z);
+    roadGroup.add(mark);
   }
-
-  addRoadMarkings();
 
   scene.add(roadGroup);
   return roadGroup;
 }
 
-// ---- إنشاء خط السكة الحديد ----
 function createRailway() {
   const railGroup = new THREE.Group();
+  const railMat = new THREE.MeshStandardMaterial({ color: 0x666666, metalness: 0.8, roughness: 0.4 });
 
-  // خط السكة الحديد (يمر بجانب الترعة)
-  const railMat = new THREE.MeshStandardMaterial({
-    color: 0x666666,
-    metalness: 0.8,
-    roughness: 0.4
-  });
-
-  // القضبان
   for (let side = -1; side <= 1; side += 2) {
     const railGeo = new THREE.BoxGeometry(0.15, 0.3, CONFIG.citySize);
     const rail = new THREE.Mesh(railGeo, railMat);
@@ -567,7 +917,6 @@ function createRailway() {
     railGroup.add(rail);
   }
 
-  // عوارض السكة
   const sleeperMat = new THREE.MeshStandardMaterial({ color: 0x4a3a2a });
   for (let z = -900; z < 900; z += 2) {
     const sleeperGeo = new THREE.BoxGeometry(4, 0.2, 0.4);
@@ -581,101 +930,177 @@ function createRailway() {
   return railGroup;
 }
 
-// ---- إنشاء الكائنات البسيطة (للتجربة) ----
-function createDebugObjects() {
-  // صندوق في المنتصف للاختبار
-  const boxGeo = new THREE.BoxGeometry(50, 20, 50);
-  const boxMat = new THREE.MeshStandardMaterial({ color: 0x8b4513 });
-  const box = new THREE.Mesh(boxGeo, boxMat);
-  box.position.set(800, 10, 600);
-  box.castShadow = true;
-  box.receiveShadow = true;
-  scene.add(box);
-
-  // عمود
-  const poleGeo = new THREE.CylinderGeometry(0.5, 0.5, 10);
-  const poleMat = new THREE.MeshStandardMaterial({ color: 0xcccccc, metalness: 0.5 });
-  const pole = new THREE.Mesh(poleGeo, poleMat);
-  pole.position.set(850, 5, 650);
-  pole.castShadow = true;
-  scene.add(pole);
-}
-
-// ---- تحديث اللاعب ----
-function updatePlayer(dt) {
+// ==========================================
+// 🚗 فيزياء التوك توك
+// ==========================================
+function updateTukTukPhysics(dt) {
   if (!player.isLocked) return;
 
-  // اتجاه الحركة بناءً على الكاميرا
-  const forward = new THREE.Vector3();
-  const right = new THREE.Vector3();
+  // ---- 1. تسريع/تباطؤ ----
+  const throttle = (keys['KeyW'] || keys['ArrowUp']) ? 1 : 0;
+  const brake = (keys['KeyS'] || keys['ArrowDown']) ? 1 : 0;
 
-  camera.getWorldDirection(forward);
-  forward.y = 0;
-  forward.normalize();
-  right.crossVectors(forward, camera.up).normalize();
-
-  // حساب اتجاه الحركة المطلوب
-  const moveDirection = new THREE.Vector3();
-  if (keys['KeyW'] || keys['ArrowUp']) moveDirection.add(forward);
-  if (keys['KeyS'] || keys['ArrowDown']) moveDirection.sub(forward);
-  if (keys['KeyD'] || keys['ArrowRight']) moveDirection.add(right);
-  if (keys['KeyA'] || keys['ArrowLeft']) moveDirection.sub(right);
-
-  if (moveDirection.length() > 0) {
-    moveDirection.normalize();
-    player.velocity.addScaledVector(moveDirection, player.acceleration * dt);
-  }
-
-  // الاحتكاك
-  player.velocity.multiplyScalar(1 - player.friction * dt);
-
-  // تحديد السرعة القصوى
-  if (player.velocity.length() > player.maxSpeed) {
-    player.velocity.normalize().multiplyScalar(player.maxSpeed);
-  }
-
-  // تحديث الموقع
-  const oldPosition = player.position.clone();
-  player.position.addScaledVector(player.velocity, dt);
-
-  // حدود المدينة
-  const limit = CONFIG.citySize / 2 - 10;
-  player.position.x = Math.max(-limit, Math.min(limit, player.position.x));
-  player.position.z = Math.max(-limit, Math.min(limit, player.position.z));
-
-  // منع الدخول في الترعة
-  if (Math.abs(player.position.z) < CONFIG.canalWidth / 2 + 2 &&
-      !(player.position.x > 785 && player.position.x < 815)) {
-    player.position.copy(oldPosition);
-    player.velocity.set(0, 0, 0);
-  }
-
-  // تحديث الكاميرا
-  controls.getObject().position.copy(player.position);
-
-  // اهتزاز بسيط عند الحركة
-  const speed = player.velocity.length();
-  if (speed > 0.5) {
-    controls.getObject().position.y = CONFIG.playerHeight + Math.sin(Date.now() * 0.02) * 0.03 * speed;
+  if (!player.engineOn) {
+    // المحرك مطفي، التوك توك بيتوقف تدريجياً
+    player.speed *= (1 - 2 * dt);
+    player.speed = Math.max(-0.5, Math.min(0.5, player.speed));
+  } else if (player.handbrake) {
+    // فرملة يد
+    player.speed *= (1 - 8 * dt);
+    if (Math.abs(player.speed) < 0.1) player.speed = 0;
   } else {
-    controls.getObject().position.y = CONFIG.playerHeight;
+    // تسارع
+    if (throttle) {
+      player.speed += player.acceleration * dt;
+    } 
+    // فرملة/رجوع
+    else if (brake) {
+      if (player.speed > 0.5) {
+        player.speed -= player.braking * dt;
+      } else {
+        player.speed -= player.acceleration * 0.5 * dt;
+      }
+    } 
+    // احتكاك طبيعي
+    else {
+      if (player.speed > 0) {
+        player.speed -= player.friction * dt * 2;
+        if (player.speed < 0.05) player.speed = 0;
+      } else if (player.speed < 0) {
+        player.speed += player.friction * dt * 2;
+        if (player.speed > -0.05) player.speed = 0;
+      }
+    }
+
+    // تحديد السرعة القصوى
+    player.speed = Math.max(-player.maxReverseSpeed, Math.min(player.maxSpeed, player.speed));
   }
+
+  // ---- 2. التحكم في المقود ----
+  const leftInput = (keys['KeyA'] || keys['ArrowLeft']) ? 1 : 0;
+  const rightInput = (keys['KeyD'] || keys['ArrowRight']) ? 1 : 0;
+  
+  const steeringInput = rightInput - leftInput;
+  
+  // المقود بيتحرك تدريجياً
+  player.steering += (steeringInput - player.steering) * player.steeringSpeed * dt;
+  player.steering = Math.max(-1, Math.min(1, player.steering));
+
+  // زاوية العجلة (بتقل كل ما السرعة تزيد عشان الثبات)
+  const speedRatio = Math.abs(player.speed) / player.maxSpeed;
+  const maxAngle = player.maxWheelAngle * (1 - speedRatio * 0.6);
+  player.currentWheelAngle = player.steering * maxAngle;
+
+  // ---- 3. تحديث اتجاه التوك توك ----
+  // معدل الدوران يعتمد على السرعة (زي السيارات الحقيقية)
+  if (Math.abs(player.speed) > 0.1) {
+    const turnRate = player.currentWheelAngle * (player.speed / 8) * dt * 2.5;
+    tukTuk.rotation.y -= turnRate;
+  }
+
+  // ---- 4. تحديث الموقع ----
+  const forward = new THREE.Vector3(
+    Math.sin(tukTuk.rotation.y),
+    0,
+    Math.cos(tukTuk.rotation.y)
+  );
+  
+  const newPos = tukTuk.position.clone().addScaledVector(forward, player.speed * dt);
+
+  // ---- 5. التصادم مع الترعة ----
+  const inCanalX = !(newPos.x > 785 && newPos.x < 815);
+  if (Math.abs(newPos.z) < CONFIG.canalWidth / 2 + 2 && inCanalX) {
+    player.speed *= -0.3; // ارتداد بسيط
+  } else if (Math.abs(newPos.x) < CONFIG.citySize / 2 && Math.abs(newPos.z) < CONFIG.citySize / 2) {
+    tukTuk.position.copy(newPos);
+  } else {
+    player.speed *= -0.3;
+  }
+
+  // ---- 6. تحديث العجلات ----
+  const wheelRotation = (player.speed * dt) / 0.28;
+  tukTuk.userData.wheels.forEach(wheel => {
+    // دوران العجلة (حول محور X)
+    const tire = wheel.children[0];
+    if (tire) tire.rotation.x -= wheelRotation;
+    
+    // العجلة الأمامية بتلف مع المقود
+    if (wheel.userData.isFront) {
+      wheel.rotation.y = player.currentWheelAngle;
+    }
+  });
+
+  // ---- 7. تحديث المقود ----
+  tukTuk.userData.steeringWheel.rotation.z = -player.steering * Math.PI * 0.8;
+
+  // ---- 8. اهتزاز التوك توك (بناءً على السرعة) ----
+  const targetY = Math.sin(Date.now() * 0.02) * 0.015 * Math.abs(player.speed) / 5;
+  tukTuk.position.y = Math.max(0, targetY);
+
+  // ---- 9. إمالة عند الدوران ----
+  const targetRoll = -player.steering * 0.05 * (Math.abs(player.speed) / 10);
+  tukTuk.rotation.z += (targetRoll - tukTuk.rotation.z) * 5 * dt;
 }
 
-// ---- تحديث واجهة المستخدم ----
-let timeLeft = 180; // 3 دقائق
+// ==========================================
+// 📷 تحديث الكاميرا (داخل الكابينة)
+// ==========================================
+function updateCamera() {
+  // حساب موقع الكاميرا بناءً على موضع واتجاه التوك توك
+  const offset = CAMERA_OFFSET.clone();
+  
+  // تدوير موقع الكاميرا حسب اتجاه التوك توك
+  offset.applyAxisAngle(new THREE.Vector3(0, 1, 0), tukTuk.rotation.y);
+  
+  // موقع الكاميرا داخل التوك توك
+  camera.position.copy(tukTuk.position).add(offset);
+  
+  // اهتزاز الكاميرا مع التوك توك
+  camera.position.y += tukTuk.position.y;
+  
+  // اتجاه النظر (بناءً على اتجاه التوك توك + حركة الرأس)
+  const baseYaw = tukTuk.rotation.y + Math.PI; // + PI عشان الكاميرا تنظر للأمام
+  const totalYaw = baseYaw + player.headYaw;
+  const totalPitch = player.headPitch;
+  
+  // حساب اتجاه النظر
+  const lookDir = new THREE.Vector3(
+    Math.sin(totalYaw) * Math.cos(totalPitch),
+    Math.sin(totalPitch),
+    Math.cos(totalYaw) * Math.cos(totalPitch)
+  );
+  
+  camera.lookAt(camera.position.clone().add(lookDir));
+  
+  // إمالة الكاميرا عند الدوران (كمية بسيطة)
+  camera.rotation.z = -player.steering * 0.03;
+}
+
+// ==========================================
+// 📊 واجهة المستخدم
+// ==========================================
+let timeLeft = 180;
+let money = 0;
+let deliveries = 0;
 let lastTime = performance.now();
 
 function updateHUD() {
-  document.getElementById('speed').textContent = Math.round(player.velocity.length() * 3.6);
-
+  // السرعة بالكيلومتر/ساعة (تحويل بسيط)
+  const speedKmh = Math.abs(player.speed) * 3.6 * 5; // *5 لتحويل نسبي
+  document.getElementById('speed').textContent = Math.round(speedKmh);
+  
   const minutes = Math.floor(timeLeft / 60);
   const seconds = Math.floor(timeLeft % 60);
   document.getElementById('time').textContent =
     `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+  
+  document.getElementById('money').textContent = money;
+  document.getElementById('deliveries').textContent = deliveries;
 }
 
-// ---- حلقة اللعبة ----
+// ==========================================
+// 🔄 حلقة اللعبة
+// ==========================================
 function animate() {
   requestAnimationFrame(animate);
 
@@ -688,58 +1113,66 @@ function animate() {
     timeLeft -= dt;
   }
 
-  updatePlayer(dt);
+  // تحديث فيزياء التوك توك
+  updateTukTukPhysics(dt);
+
+  // تحديث الكاميرا
+  updateCamera();
+
+  // تحديث صوت المحرك
+  updateEngineSound();
+
+  // تحديث واجهة المستخدم
   updateHUD();
 
   // تحديث ضوء الشمس ليتبع اللاعب
-  sunLight.position.set(player.position.x + 100, 200, player.position.z + 50);
-  sunLight.target.position.copy(player.position);
+  sunLight.position.set(tukTuk.position.x + 150, 250, tukTuk.position.z + 100);
+  sunLight.target.position.copy(tukTuk.position);
   sunLight.target.updateMatrixWorld();
 
   // موجات الترعة
-  const waterMesh = scene.children.find(c => c.type === 'Group' && c.children.some(ch => ch.geometry?.type === 'PlaneGeometry'));
-  if (waterMesh) {
-    waterMesh.children.forEach(child => {
-      if (child.geometry?.type === 'PlaneGeometry' && child.material?.transparent) {
-        child.position.y = -0.5 + Math.sin(now * 0.001) * 0.1;
-      }
-    });
+  const waterGroup = scene.children.find(c => c.userData.water);
+  if (waterGroup && waterGroup.userData.water) {
+    const geo = waterGroup.userData.water.geometry;
+    const pos = geo.attributes.position;
+    const time = now * 0.001;
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i);
+      const y = pos.getY(i);
+      pos.setZ(i, Math.sin(x * 0.1 + time) * 0.3 + Math.cos(y * 0.1 + time * 1.3) * 0.2);
+    }
+    pos.needsUpdate = true;
+    geo.computeVertexNormals();
   }
 
   renderer.render(scene, camera);
 }
 
-// ---- الاستجابة لتغيير حجم الشاشة ----
+// ==========================================
+// 🎬 التهيئة
+// ==========================================
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
-// ---- التهيئة ----
 function init() {
-  console.log('🛺 توك توك كفر الدوار - جاري التحميل...');
+  console.log('🛺 جاري تحميل توك توك كفر الدوار - المرحلة 2...');
 
-  // إنشاء المدينة
   createGround();
   createCanal();
   createRoads();
   createRailway();
-  createDebugObjects();
 
-  // وضع اللاعب في نقطة البداية
-  player.position.set(800, CONFIG.playerHeight, 600);
-  camera.position.copy(player.position);
+  // تحديث تعليمات الحركة
+  document.getElementById('instructions').innerHTML = 
+    'W للأمام | S للخلف/فرملة | A/D للدوران | Space فرملة يد | E تشغيل/إطفاء | الماوس للنظر';
 
-  // بدء الحلقة
   animate();
-
-  console.log('✅ المدينة جاهزة!');
-  console.log('📍 إحداثيات كفر الدوار الحقيقية: 31.1303°N, 30.1313°E');
+  console.log('✅ جاهز للانطلاق!');
 }
 
-// بدء اللعبة
-init();
-</script>
+init();</script>
 </body>
 </html>
